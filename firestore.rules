@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function getUserRole() {
+      return getUserData().role;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && getUserRole() == role;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isOwner(userId) || hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+    
+    // Jobs collection
+    match /jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        hasRole('designer') || 
+        hasRole('admin') ||
+        resource.data.customerId == request.auth.uid
+      );
+      allow delete: if hasRole('admin');
+    }
+    
+    // Orders collection
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if hasRole('admin') || hasRole('designer');
+      allow delete: if hasRole('admin');
+    }
+    
+    // Proofs collection
+    match /proofs/{proofId} {
+      allow read: if isAuthenticated();
+      allow create: if hasRole('designer') || hasRole('admin');
+      allow update: if isAuthenticated();
+      allow delete: if hasRole('admin');
+    }
+    
+    // Pre-flight reports
+    match /preflightReports/{reportId} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('designer') || hasRole('admin');
+    }
+    
+    // Auto-fix reports
+    match /autoFixReports/{reportId} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('designer') || hasRole('admin');
+    }
+    
+    // Approval workflows
+    match /approvalWorkflows/{workflowId} {
+      allow read: if isAuthenticated();
+      allow create: if hasRole('designer') || hasRole('admin');
+      allow update: if isAuthenticated();
+      allow delete: if hasRole('admin');
+    }
+    
+    // Batch jobs
+    match /batchJobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('designer') || hasRole('admin');
+    }
+    
+    // Email queue (backend only)
+    match /emailQueue/{emailId} {
+      allow read, write: if false;
+    }
+    
+    // Notification logs
+    match /notificationLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+    
+    // Analytics
+    match /analytics/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('admin');
+    }
+    
+    // System settings
+    match /settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('admin');
+    }
+  }
+}

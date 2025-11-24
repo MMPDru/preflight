@@ -1,0 +1,70 @@
+
+// Add to analyzePDF function after page geometry checks (around line 189):
+
+        // --- Layer Detection ---
+        let hasLayers = false;
+        let layerCount = 0;
+        const layerNames: string[] = [];
+
+        // Check for Optional Content Groups (OCGs) - PDF layers
+        const catalog = pdfDoc.catalog;
+        const ocProperties = catalog.get(PDFName.of('OCProperties'));
+        if (ocProperties && ocProperties instanceof PDFDict) {
+            const ocgs = ocProperties.get(PDFName.of('OCGs'));
+            if (ocgs && ocgs instanceof PDFArray) {
+                hasLayers = true;
+                layerCount = ocgs.size();
+                // Extract layer names if possible
+                for (let i = 0; i < Math.min(ocgs.size(), 10); i++) {
+                    const ocg = ocgs.get(i);
+                    if (ocg && ocg instanceof PDFDict) {
+                        const name = ocg.get(PDFName.of('Name'));
+                        if (name) {
+                            layerNames.push(name.toString().replace(/[()]/g, ''));
+                        }
+                    }
+                }
+            }
+        }
+
+        if (hasLayers) {
+            const layerList = layerNames.length > 0 ? ` (${layerNames.slice(0, 3).join(', ')}${layerNames.length > 3 ? '...' : ''})` : '';
+            results.push({ 
+                id: 'adv-layers', 
+                label: 'Layer Detection', 
+                status: 'warning', 
+                message: `${layerCount} layers detected${layerList}. Verify layer visibility for print.`, 
+                category: 'geometry' 
+            });
+        } else {
+            results.push({ 
+                id: 'adv-layers', 
+                label: 'Layer Detection', 
+                status: 'pass', 
+                message: 'No layers detected.', 
+                category: 'geometry' 
+            });
+        }
+
+        // --- PDF/X Compliance Check ---
+        let isPDFX = false;
+        const info = pdfDoc.getInfoDict();
+        const gtsVersion = info.get(PDFName.of('GTS_PDFXVersion'));
+        if (gtsVersion) {
+            isPDFX = true;
+            results.push({ 
+                id: 'adv-pdfx', 
+                label: 'PDF/X Compliance', 
+                status: 'pass', 
+                message: `PDF/X compliant: ${gtsVersion.toString()}`, 
+                category: 'metadata' 
+            });
+        } else {
+            results.push({ 
+                id: 'adv-pdfx', 
+                label: 'PDF/X Compliance', 
+                status: 'warning', 
+                message: 'Not PDF/X compliant. Consider converting for print production.', 
+                category: 'metadata' 
+            });
+        }

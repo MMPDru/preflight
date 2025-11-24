@@ -1,0 +1,71 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && getUserRole() == role;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // PDF uploads
+    match /uploads/{userId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || hasRole('designer') || hasRole('admin');
+      allow delete: if isOwner(userId) || hasRole('admin');
+    }
+    
+    // Fixed PDFs
+    match /fixed/{jobId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('designer') || hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+    
+    // Proofs
+    match /proofs/{jobId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('designer') || hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+    
+    // Batch processing results
+    match /batch/{batchId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if hasRole('designer') || hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+    
+    // User avatars
+    match /avatars/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
+      allow delete: if isOwner(userId) || hasRole('admin');
+    }
+    
+    // Brand assets
+    match /brand-assets/{customerId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(customerId) || hasRole('admin');
+      allow delete: if isOwner(customerId) || hasRole('admin');
+    }
+    
+    // Temporary files (auto-delete after 24 hours)
+    match /temp/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      allow delete: if true;
+    }
+  }
+}
