@@ -1,9 +1,8 @@
 
-
 export interface FixHistoryEntry {
     id: string;
     timestamp: Date;
-    fixType: 'metadata' | 'bleed' | 'color' | 'font' | 'image' | 'other';
+    fixType: 'metadata' | 'bleed' | 'color' | 'font' | 'image' | 'other' | 'compliance';
     description: string;
     beforeUrl: string;
     afterUrl: string;

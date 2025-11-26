@@ -25,9 +25,17 @@ export const useAuth = () => {
 
 interface AuthProviderProps {
     children: ReactNode;
+    loadingFallback?: ReactNode;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({
+    children,
+    loadingFallback = (
+        <div className="flex items-center justify-center min-h-screen">
+            <span className="text-gray-500">Loading...</span>
+        </div>
+    ),
+}) => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -177,7 +185,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {loading ? (
+                <div className="flex items-center justify-center min-h-screen">
+                    <span className="text-gray-500">Loading...</span>
+                </div>
+            ) : (
+                children
+            )}
         </AuthContext.Provider>
     );
 };

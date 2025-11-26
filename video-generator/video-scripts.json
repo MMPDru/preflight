@@ -1,0 +1,656 @@
+{
+    "scripts": [
+        {
+            "id": "login",
+            "title": "How to Log In",
+            "duration": "3:00",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/login",
+                    "description": "Open the login page"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "type",
+                    "target": "#email",
+                    "value": "demo@example.com",
+                    "description": "Enter email"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "type",
+                    "target": "#password",
+                    "value": "demoPass123",
+                    "description": "Enter password"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "click",
+                    "target": "#sign-in-button",
+                    "description": "Click Sign In"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "wait",
+                    "duration": 2000,
+                    "description": "Wait for redirect"
+                }
+            ],
+            "voiceover": [
+                "Welcome to PreFlight Pro. In this short video we’ll show you how to log in.",
+                "First, open the login page.",
+                "Enter your email address in the email field.",
+                "Enter your password in the password field.",
+                "Click the Sign In button.",
+                "If the credentials are correct you’ll be taken to the Dashboard."
+            ]
+        },
+        {
+            "id": "dashboard",
+            "title": "Navigating the Dashboard",
+            "duration": "4:30",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/dashboard",
+                    "description": "Open the Dashboard"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "hover",
+                    "target": ".job-card:first-child",
+                    "description": "Hover a job card to see preview"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "click",
+                    "target": ".job-card:first-child .view-button",
+                    "description": "Open job details"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "click",
+                    "target": "#upload-button",
+                    "description": "Click Upload to start a new analysis"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "type",
+                    "target": "#file-input",
+                    "value": "sample.pdf",
+                    "description": "Select a PDF file"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "click",
+                    "target": "#confirm-upload",
+                    "description": "Confirm upload"
+                },
+                {
+                    "timestamp": 30,
+                    "action": "wait",
+                    "duration": 3000,
+                    "description": "Wait for processing"
+                }
+            ],
+            "voiceover": [
+                "This is the Dashboard – the central hub of PreFlight Pro.",
+                "Here you can see a quick summary of your most recent jobs.",
+                "Hover over a job card to preview the PDF and see quick actions.",
+                "Click the View button to open the full job details.",
+                "Use the Upload button to start a new PDF analysis.",
+                "Select the file you want to analyze and confirm the upload.",
+                "The system will process the PDF and show the results when ready."
+            ]
+        },
+        {
+            "id": "assets",
+            "title": "Managing Assets",
+            "duration": "3:30",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/assets",
+                    "description": "Open the Assets page"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": "#upload-assets",
+                    "description": "Click Upload Assets"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "type",
+                    "target": "#file-input-assets",
+                    "value": "image.png",
+                    "description": "Select an image file"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "click",
+                    "target": "#confirm-upload-assets",
+                    "description": "Confirm upload"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "wait",
+                    "duration": 1500,
+                    "description": "Wait for upload to finish"
+                },
+                {
+                    "timestamp": 22,
+                    "action": "click",
+                    "target": ".asset-card:first-child .delete-button",
+                    "description": "Delete an asset"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "wait",
+                    "duration": 1000,
+                    "description": "Wait for deletion"
+                }
+            ],
+            "voiceover": [
+                "The Assets page lets you store and manage your PDFs, images and other files.",
+                "Click the Upload button to add a new file.",
+                "Select the file from your computer and confirm the upload.",
+                "Uploaded assets appear in a grid view.",
+                "You can delete any asset by clicking the trash icon on its card."
+            ]
+        },
+        {
+            "id": "reviews",
+            "title": "Viewing Job History",
+            "duration": "3:00",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/reviews",
+                    "description": "Open the Reviews page"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": ".review-row:first-child .view-button",
+                    "description": "Open a job review"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "click",
+                    "target": "#export-csv",
+                    "description": "Export job history as CSV"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "wait",
+                    "duration": 2000,
+                    "description": "Wait for download"
+                }
+            ],
+            "voiceover": [
+                "The Reviews page shows a full history of all PDF analyses.",
+                "Click the View button on any row to see detailed results.",
+                "You can export the entire job list as a CSV file for reporting purposes."
+            ]
+        },
+        {
+            "id": "user-management",
+            "title": "Managing Users",
+            "duration": "4:00",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/users",
+                    "description": "Open the Users page"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": "#add-user",
+                    "description": "Open Add User dialog"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "type",
+                    "target": "#new-email",
+                    "value": "newuser@example.com",
+                    "description": "Enter email"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "select",
+                    "target": "#new-role",
+                    "value": "designer",
+                    "description": "Select role"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "click",
+                    "target": "#save-user",
+                    "description": "Save new user"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "wait",
+                    "duration": 1500,
+                    "description": "Wait for creation"
+                },
+                {
+                    "timestamp": 30,
+                    "action": "click",
+                    "target": ".user-row:first-child .edit-button",
+                    "description": "Edit existing user"
+                },
+                {
+                    "timestamp": 35,
+                    "action": "select",
+                    "target": "#edit-role",
+                    "value": "admin",
+                    "description": "Change role to admin"
+                },
+                {
+                    "timestamp": 40,
+                    "action": "click",
+                    "target": "#save-edit",
+                    "description": "Save changes"
+                },
+                {
+                    "timestamp": 45,
+                    "action": "wait",
+                    "duration": 1500,
+                    "description": "Wait for update"
+                }
+            ],
+            "voiceover": [
+                "The Users page is only visible to admins.",
+                "Click Add User to invite a new team member.",
+                "Enter their email address and choose a role.",
+                "Save the user to create the account.",
+                "You can edit any existing user by clicking the edit icon and changing their role."
+            ]
+        },
+        {
+            "id": "settings",
+            "title": "Adjusting Settings",
+            "duration": "2:30",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/settings",
+                    "description": "Open Settings page"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "toggle",
+                    "target": "#dark-mode",
+                    "description": "Enable dark mode"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "upload",
+                    "target": "#logo-upload",
+                    "value": "logo.png",
+                    "description": "Upload a new branding logo"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "click",
+                    "target": "#save-settings",
+                    "description": "Save changes"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "wait",
+                    "duration": 1000,
+                    "description": "Wait for confirmation"
+                }
+            ],
+            "voiceover": [
+                "In Settings you can customize the look and feel of the application.",
+                "Toggle Dark Mode to switch to a dark theme.",
+                "Upload a new logo to brand the app.",
+                "Click Save to apply your changes."
+            ]
+        },
+        {
+            "id": "pdf-fixer",
+            "title": "Using the PDF Fixer API",
+            "duration": "3:45",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/dashboard",
+                    "description": "Open Dashboard"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": "#upload-button",
+                    "description": "Open Upload dialog"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "type",
+                    "target": "#file-input",
+                    "value": "sample.pdf",
+                    "description": "Select PDF"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "click",
+                    "target": "#confirm-upload",
+                    "description": "Upload PDF"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "click",
+                    "target": ".job-card:first-child .fix-button",
+                    "description": "Open Fix options"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "select",
+                    "target": "#fix-types",
+                    "value": "['embed-fonts','resample-images']",
+                    "description": "Choose fix types"
+                },
+                {
+                    "timestamp": 30,
+                    "action": "click",
+                    "target": "#apply-fix",
+                    "description": "Apply fixes"
+                },
+                {
+                    "timestamp": 35,
+                    "action": "wait",
+                    "duration": 3000,
+                    "description": "Wait for processing"
+                },
+                {
+                    "timestamp": 38,
+                    "action": "click",
+                    "target": ".job-card:first-child .download-button",
+                    "description": "Download fixed PDF"
+                }
+            ],
+            "voiceover": [
+                "The PDF Fixer API lets you apply automatic corrections to your PDFs.",
+                "Upload a PDF from the Dashboard, then open the Fix options.",
+                "Select the fixes you need, such as embedding fonts or resampling images.",
+                "Apply the fixes and wait for the service to process the file.",
+                "When finished you can download the corrected PDF."
+            ]
+        },
+        {
+            "id": "bleed-fixer",
+            "title": "Correcting Bleed Settings",
+            "duration": "3:00",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/editor",
+                    "description": "Open the PDF Editor"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": "#bleed-fix-button",
+                    "description": "Open Bleed Fix dialog"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "type",
+                    "target": "#bleed-size",
+                    "value": "3",
+                    "description": "Set bleed size to 3 mm"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "toggle",
+                    "target": "#preserve-crop",
+                    "description": "Enable Preserve Crop"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "click",
+                    "target": "#apply-bleed",
+                    "description": "Apply bleed correction"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "wait",
+                    "duration": 2000,
+                    "description": "Wait for processing"
+                },
+                {
+                    "timestamp": 27,
+                    "action": "click",
+                    "target": "#download-pdf",
+                    "description": "Download corrected PDF"
+                }
+            ],
+            "voiceover": [
+                "The Bleed Fixer adjusts the bleed boxes of your PDF for proper printing.",
+                "Open the PDF in the Editor and click the Bleed Fix button.",
+                "Enter the desired bleed size (default 3 mm) and optionally preserve the crop box.",
+                "Apply the correction and download the updated PDF."
+            ]
+        },
+        {
+            "id": "automation",
+            "title": "Running an Automation Template",
+            "duration": "4:15",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/automation",
+                    "description": "Open Automation page"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": ".template-card:first-child .apply-button",
+                    "description": "Apply first template"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "click",
+                    "target": "#upload-pdf",
+                    "description": "Upload PDF for automation"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "type",
+                    "target": "#file-input",
+                    "value": "sample.pdf",
+                    "description": "Select PDF"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "click",
+                    "target": "#confirm-upload",
+                    "description": "Confirm upload"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "wait",
+                    "duration": 4000,
+                    "description": "Wait for all fixes to run"
+                },
+                {
+                    "timestamp": 30,
+                    "action": "click",
+                    "target": ".job-card:first-child .download-button",
+                    "description": "Download final PDF"
+                }
+            ],
+            "voiceover": [
+                "Automation templates let you chain multiple fixes into a single workflow.",
+                "Open the Automation page and select a template.",
+                "Upload the PDF you want to process.",
+                "The system will run each fix in order.",
+                "When finished you can download the final corrected PDF."
+            ]
+        },
+        {
+            "id": "editor",
+            "title": "Using the PDF Editor",
+            "duration": "5:00",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/editor",
+                    "description": "Open the Editor"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": "#add-annotation",
+                    "description": "Add an annotation"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "type",
+                    "target": "#annotation-text",
+                    "value": "Check this area",
+                    "description": "Enter annotation text"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "click",
+                    "target": "#save-annotation",
+                    "description": "Save annotation"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "click",
+                    "target": "#zoom-in",
+                    "description": "Zoom in"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "click",
+                    "target": "#rotate",
+                    "description": "Rotate page"
+                },
+                {
+                    "timestamp": 30,
+                    "action": "click",
+                    "target": "#export-pdf",
+                    "description": "Export edited PDF"
+                },
+                {
+                    "timestamp": 35,
+                    "action": "wait",
+                    "duration": 2000,
+                    "description": "Wait for export"
+                }
+            ],
+            "voiceover": [
+                "The Editor lets you view, annotate and modify PDFs.",
+                "Add annotations by clicking the Add Annotation button and typing your note.",
+                "Use the toolbar to zoom, rotate or navigate pages.",
+                "When you’re done, export the edited PDF to download it."
+            ]
+        },
+        {
+            "id": "training-center",
+            "title": "Exploring the Training Center",
+            "duration": "2:45",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/training",
+                    "description": "Open Training Center"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "type",
+                    "target": "#search-bar",
+                    "value": "pdf fixer",
+                    "description": "Search for a video"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "click",
+                    "target": ".video-card:first-child .play-button",
+                    "description": "Play video"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "wait",
+                    "duration": 5000,
+                    "description": "Watch part of the video"
+                },
+                {
+                    "timestamp": 20,
+                    "action": "click",
+                    "target": "#download-transcript",
+                    "description": "Download transcript"
+                }
+            ],
+            "voiceover": [
+                "The Training Center houses all tutorial videos.",
+                "Use the search bar to find a specific topic.",
+                "Click a video to start playback.",
+                "You can download the transcript for offline reference."
+            ]
+        },
+        {
+            "id": "live-support",
+            "title": "Requesting Live Support",
+            "duration": "2:30",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "/dashboard",
+                    "description": "Open Dashboard"
+                },
+                {
+                    "timestamp": 5,
+                    "action": "click",
+                    "target": "#request-live-help",
+                    "description": "Open Live Support modal"
+                },
+                {
+                    "timestamp": 10,
+                    "action": "click",
+                    "target": "#start-video-call",
+                    "description": "Start video call"
+                },
+                {
+                    "timestamp": 15,
+                    "action": "wait",
+                    "duration": 10000,
+                    "description": "Simulate 10‑second support session"
+                },
+                {
+                    "timestamp": 25,
+                    "action": "click",
+                    "target": "#end-call",
+                    "description": "End call"
+                }
+            ],
+            "voiceover": [
+                "If you need assistance, click Request Live Help in the header.",
+                "A modal opens with a video‑call interface.",
+                "Start the call and speak with a support agent.",
+                "When finished, end the call and close the modal."
+            ]
+        }
+    ]
+}

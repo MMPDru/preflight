@@ -5,12 +5,12 @@ import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    apiKey: "AIzaSyDxW5CR6kiO5j6D-AW39A9kQSU-5kb_dw0",
+    authDomain: "gen-lang-client-0375513343.firebaseapp.com",
+    projectId: "gen-lang-client-0375513343",
+    storageBucket: "gen-lang-client-0375513343.firebasestorage.app",
+    messagingSenderId: "603100017596",
+    appId: "1:603100017596:web:5cf5da1a0bddb92be1b1b9"
 };
 
 // Validate configuration

@@ -57,8 +57,11 @@ export async function analyzePDF(file: string | Uint8Array, profile: PreflightPr
             existingPdfBytes = file;
 
             // Load with pdf.js using data
-            console.log('[analyzePDF] Loading with pdf.js using data...');
-            const loadingTask = pdfjs.getDocument({ data: file });
+            // IMPORTANT: Clone the data for pdf.js because it might transfer/detach the buffer
+            // preventing us from using it later with pdf-lib
+            console.log('[analyzePDF] Loading with pdf.js using data (cloned)...');
+            const dataCopy = new Uint8Array(file);
+            const loadingTask = pdfjs.getDocument({ data: dataCopy });
             pdfProxy = await loadingTask.promise;
             console.log('[analyzePDF] pdf.js loaded successfully');
         }

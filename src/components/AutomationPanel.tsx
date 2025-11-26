@@ -4,6 +4,7 @@ import { automationTemplates, type AutomationTemplate, executeTemplate } from '.
 import { savedWorkflows, executeWorkflow, type SavedWorkflow } from '../lib/saved-workflows';
 import { WorkflowBuilder } from './WorkflowBuilder';
 import { BulkOperations } from './BulkOperations';
+import { HelpButton } from './HelpButton';
 import clsx from 'clsx';
 
 interface AutomationPanelProps {
@@ -19,6 +20,8 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ onClose, fileU
     const [showWorkflowBuilder, setShowWorkflowBuilder] = useState(false);
     const [showBulkOps, setShowBulkOps] = useState(false);
     const [activeTab, setActiveTab] = useState<'templates' | 'workflows'>('templates');
+    const [progress, setProgress] = useState<Map<string, number>>(new Map());
+    const [estimatedTime, setEstimatedTime] = useState<Map<string, number>>(new Map());
 
     const categories = ['all', 'fonts', 'colors', 'images', 'geometry', 'transparency', 'layers', 'overprint', 'ink'];
     const severities = ['all', 'critical', 'high', 'medium', 'low'];
@@ -32,8 +35,58 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ onClose, fileU
     const handleExecuteTemplate = async (template: AutomationTemplate) => {
         setExecutingTemplates(prev => new Set(prev).add(template.id));
 
+        // Parse estimated time (e.g., "10-30s" -> 20s average)
+        const timeMatch = template.estimatedTime.match(/(\d+)-?(\d+)?s/);
+        const avgTime = timeMatch ? (parseInt(timeMatch[1]) + (parseInt(timeMatch[2] || timeMatch[1]))) / 2 : 15;
+
+        // Set initial progress
+        setProgress(prev => new Map(prev).set(template.id, 0));
+        setEstimatedTime(prev => new Map(prev).set(template.id, avgTime));
+
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+            setProgress(prev => {
+                const current = prev.get(template.id) || 0;
+                if (current < 90) {
+                    const newMap = new Map(prev);
+                    newMap.set(template.id, current + 10);
+                    return newMap;
+                }
+                return prev;
+            });
+
+            setEstimatedTime(prev => {
+                const current = prev.get(template.id) || 0;
+                if (current > 0) {
+                    const newMap = new Map(prev);
+                    newMap.set(template.id, Math.max(0, current - 2));
+                    return newMap;
+                }
+                return prev;
+            });
+        }, (avgTime * 1000) / 10); // Update 10 times during execution
+
         try {
-            const result = await executeTemplate(template.id, fileUrl);
+            let result;
+            if (template.requiresBackend) {
+                // Map template ID to backend fix type
+                let fixType = 'other';
+                if (template.id.includes('cmyk')) fixType = 'cmyk';
+                else if (template.id.includes('font')) fixType = 'fonts';
+                else if (template.id.includes('resample')) fixType = 'resample';
+                else if (template.id.includes('bleed')) fixType = 'bleed';
+                else if (template.id.includes('boxes')) fixType = 'boxes';
+                else if (template.id.includes('marks')) fixType = 'marks';
+                else if (template.id.includes('split')) fixType = 'split';
+
+                const { fixPdfWithBackend } = await import('../lib/backend-api');
+                result = await fixPdfWithBackend(fileUrl, [fixType]);
+            } else {
+                result = await executeTemplate(template.id, fileUrl);
+            }
+
+            // Set to 100% on completion
+            setProgress(prev => new Map(prev).set(template.id, 100));
             setResults(prev => new Map(prev).set(template.id, result));
         } catch (error) {
             setResults(prev => new Map(prev).set(template.id, {
@@ -41,11 +94,26 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ onClose, fileU
                 message: `Error: ${error}`,
             }));
         } finally {
+            clearInterval(progressInterval);
             setExecutingTemplates(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(template.id);
                 return newSet;
             });
+
+            // Clear progress after a delay
+            setTimeout(() => {
+                setProgress(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(template.id);
+                    return newMap;
+                });
+                setEstimatedTime(prev => {
+                    const newMap = new Map(prev);
+                    newMap.delete(template.id);
+                    return newMap;
+                });
+            }, 2000);
         }
     };
 
@@ -72,6 +140,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ onClose, fileU
                         <h2 className="text-2xl font-bold text-text flex items-center gap-3">
                             <Zap size={28} className="text-primary" />
                             PDF Correction Templates
+                            <HelpButton videoId="templates-overview" variant="icon" size="sm" />
                         </h2>
                         <p className="text-sm text-muted mt-1">
                             Automated fixes for web-to-print workflow
@@ -246,6 +315,22 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ onClose, fileU
                                                             </div>
                                                         )}
                                                     </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Progress Bar */}
+                                        {isExecuting && (
+                                            <div className="mb-3">
+                                                <div className="flex items-center justify-between text-xs text-muted mb-1">
+                                                    <span>Processing...</span>
+                                                    <span>{estimatedTime.get(template.id) || 0}s remaining</span>
+                                                </div>
+                                                <div className="w-full bg-surface rounded-full h-2 overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-primary transition-all duration-300 ease-out"
+                                                        style={{ width: `${progress.get(template.id) || 0}%` }}
+                                                    />
                                                 </div>
                                             </div>
                                         )}

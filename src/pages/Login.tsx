@@ -25,13 +25,28 @@ const Login: React.FC = () => {
             return;
         }
 
+        setError(''); // Clear previous errors
+        setLoading(true);
+
         try {
-            setError('');
-            setLoading(true);
-            await login(email, password);
-            navigate('/dashboard');
+            await login(email, password); // Use the 'login' function from useAuth
+            // Navigation is handled by the useEffect hook when currentUser updates
         } catch (err: any) {
-            setError(err.message || 'Failed to login');
+            console.error('Login error:', err);
+            // Show specific error messages based on Firebase error codes
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+                setError('No account found with this email or incorrect credentials. Please check your email and password.');
+            } else if (err.code === 'auth/wrong-password') {
+                setError('Incorrect password.');
+            } else if (err.code === 'auth/network-request-failed') {
+                setError('Network error. Please check your connection.');
+            } else if (err.code === 'auth/too-many-requests') {
+                setError('Too many failed login attempts. Please try again later.');
+            }
+            else {
+                // Fallback to the error message, which might come from AuthContext
+                setError(err.message || 'Failed to login. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
@@ -41,12 +56,14 @@ const Login: React.FC = () => {
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
             <div className="w-full max-w-md">
                 {/* Logo/Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4 shadow-lg shadow-purple-500/50">
-                        <LogIn className="w-8 h-8 text-white" />
+                <div className="text-center">
+                    <div className="mx-auto h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg mb-4">
+                        <LogIn className="h-6 w-6 text-white" />
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-                    <p className="text-slate-400">Sign in to PreFlight Pro</p>
+                    <h2 className="text-2xl font-bold text-white">Welcome to PreFlight Pro Cloud</h2>
+                    <p className="mt-2 text-sm text-gray-400">
+                        Sign in to your account
+                    </p>
                 </div>
 
                 {/* Login Card */}

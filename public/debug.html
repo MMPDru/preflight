@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Console</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #00ff00;
+        }
+        h1 {
+            color: #00ff00;
+        }
+        .log-container {
+            background: #000;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border: 1px solid #00ff00;
+        }
+        .error {
+            color: #ff4444;
+        }
+        .warn {
+            color: #ffaa00;
+        }
+        .info {
+            color: #00aaff;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 PreFlight Pro Debug Console</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        const output = document.getElementById('output');
+        const logs = [];
+        
+        function addLog(type, ...args) {
+            const timestamp = new Date().toISOString();
+            const message = args.map(a => {
+                if (typeof a === 'object') {
+                    try {
+                        return JSON.stringify(a, null, 2);
+                    } catch (e) {
+                        return String(a);
+                    }
+                }
+                return String(a);
+            }).join(' ');
+            
+            logs.push({type, message, timestamp});
+            
+            const div = document.createElement('div');
+            div.className = `log-container ${type}`;
+            div.innerHTML = `<strong>[${type.toUpperCase()}]</strong> ${timestamp}<br><pre>${message}</pre>`;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        // Capture all console methods
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const originalInfo = console.info;
+        
+        console.log = function(...args) {
+            addLog('info', ...args);
+            originalLog.apply(console, args);
+        };
+        
+        console.error = function(...args) {
+            addLog('error', ...args);
+            originalError.apply(console, args);
+        };
+        
+        console.warn = function(...args) {
+            addLog('warn', ...args);
+            originalWarn.apply(console, args);
+        };
+        
+        console.info = function(...args) {
+            addLog('info', ...args);
+            originalInfo.apply(console, args);
+        };
+        
+        // Capture global errors
+        window.addEventListener('error', (e) => {
+            addLog('error', `Global Error: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`);
+        });
+        
+        window.addEventListener('unhandledrejection', (e) => {
+            addLog('error', `Unhandled Promise Rejection: ${e.reason}`);
+        });
+        
+        addLog('info', 'Debug console initialized');
+        
+        // Now load the actual app
+        console.log('Loading main application...');
+        
+        try {
+            // Import the main app module
+            import('/assets/index-Zz0G-6-D.js')
+                .then(() => {
+                    console.log('✅ Main app module loaded successfully');
+                })
+                .catch(err => {
+                    console.error('❌ Failed to load main app module:', err);
+                    addLog('error', 'Module loading error:', err.message, err.stack);
+                });
+        } catch (err) {
+            console.error('❌ Failed to import app:', err);
+            addLog('error', 'Import error:', err.message, err.stack);
+        }
+    </script>
+    
+    <div id="root"></div>
+</body>
+</html>

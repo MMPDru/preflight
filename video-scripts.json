@@ -1,0 +1,121 @@
+{
+    "scripts": [
+        // Auto‑generated script for each Cloud Function
+        // Each entry navigates to the source file in the repo viewer (GitHub) and scrolls through it.
+        // In a real production setup you would replace the URLs with your own repo viewer URLs.
+        {
+            "id": "onDeploymentWebhook",
+            "title": "On Deployment Webhook Function",
+            "duration": "2:30",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "https://github.com/your-repo/pre-press-app/functions/src/autodoc/index.ts",
+                    "description": "Open the onDeploymentWebhook source file in the repo viewer."
+                },
+                {
+                    "timestamp": 5,
+                    "action": "scroll",
+                    "target": "body",
+                    "description": "Scroll through the file to show the webhook logic."
+                }
+            ],
+            "voiceover": [
+                "This video walks through the onDeploymentWebhook Cloud Function, which is triggered after each deployment to start the documentation pipeline.",
+                "First we open the source file in the repository viewer, then we scroll to see how the function extracts deployment data and forwards it to the training video generator."
+            ]
+        },
+        {
+            "id": "scheduledDocReview",
+            "title": "Scheduled Documentation Review",
+            "duration": "2:00",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "https://github.com/your-repo/pre-press-app/functions/src/autodoc/index.ts",
+                    "description": "Open the scheduledDocReview function source file."
+                },
+                {
+                    "timestamp": 5,
+                    "action": "scroll",
+                    "target": "body",
+                    "description": "Scroll to show the daily review logic."
+                }
+            ],
+            "voiceover": [
+                "The scheduledDocReview function runs daily to check for pending documentation updates.",
+                "It scans Firestore for any changes that need new training material and triggers the generator when needed."
+            ]
+        },
+        {
+            "id": "pdfFixer",
+            "title": "PDF Fixer Service",
+            "duration": "3:00",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "https://github.com/your-repo/pre-press-app/functions/src/services/pdf-fixer.ts",
+                    "description": "Open the PDF Fixer service source file."
+                },
+                {
+                    "timestamp": 5,
+                    "action": "scroll",
+                    "target": "body",
+                    "description": "Scroll through the code that processes PDF fixes."
+                }
+            ],
+            "voiceover": [
+                "The PDF Fixer service receives a PDF, applies selected fixes, and returns the corrected file.",
+                "This video demonstrates the service’s API endpoint and the internal processing steps."
+            ]
+        },
+        {
+            "id": "emailNotification",
+            "title": "Email Notification Service",
+            "duration": "2:30",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "https://github.com/your-repo/pre-press-app/functions/src/services/email-notification-service.ts",
+                    "description": "Open the email notification service source file."
+                },
+                {
+                    "timestamp": 5,
+                    "action": "scroll",
+                    "target": "body",
+                    "description": "Scroll to show email composition and sending logic."
+                }
+            ],
+            "voiceover": [
+                "This service builds and sends email notifications to users when a job completes.",
+                "We walk through the template rendering and the call to the email provider API."
+            ]
+        },
+        {
+            "id": "autoDocumentation",
+            "title": "Auto‑Documentation Orchestrator",
+            "duration": "3:30",
+            "steps": [
+                {
+                    "timestamp": 0,
+                    "action": "navigate",
+                    "target": "https://github.com/your-repo/pre-press-app/functions/src/autodoc/index.ts",
+                    "description": "Open the auto‑documentation orchestrator source file."
+                },
+                {
+                    "timestamp": 5,
+                    "action": "scroll",
+                    "target": "body",
+                    "description": "Scroll through the webhook and scheduler setup."
+                ],
+                "voiceover": [
+                    "The auto‑documentation system ties together change detection, content generation, and training updates.",
+                    "This video shows how the webhook triggers the pipeline and how the scheduled review runs daily."
+                ]
+            }
+        ]
+    }

@@ -1,8 +1,23 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileImage, Settings, Bell, Headphones, Calendar } from 'lucide-react';
+import { LayoutDashboard, FileImage, Settings, Bell, Headphones, Calendar, Users, GraduationCap } from 'lucide-react';
 import clsx from 'clsx';
 import { LiveSupport } from './LiveSupport';
+
+// Placeholder for permission checking. In a real app, this would come from user context or an auth service.
+const hasPermission = (permission: string) => {
+    // For demonstration, let's say all permissions are granted.
+    // In a real application, you would check the user's roles/permissions.
+    return true;
+};
+
+const sidebarNavItems = [
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', permission: 'dashboard:view' },
+    { path: '/assets', icon: FileImage, label: 'Assets', permission: 'files:view-all' },
+    { path: '/reviews', icon: Calendar, label: 'Reviews', permission: 'reviews:view' },
+    { path: '/users', icon: Users, label: 'Users', permission: 'users:manage-roles' },
+    { path: '/settings', icon: Settings, label: 'Settings', permission: 'settings:view' },
+];
 
 const SidebarItem = ({ to, icon: Icon, label }: { to: string; icon: any; label: string }) => (
     <NavLink
@@ -39,6 +54,7 @@ const Layout = () => {
                     <SidebarItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" />
                     <SidebarItem to="/assets" icon={FileImage} label="Assets" />
                     <SidebarItem to="/reviews" icon={Calendar} label="Reviews" />
+                    <SidebarItem to="/training" icon={GraduationCap} label="Training Center" />
                     <SidebarItem to="/settings" icon={Settings} label="Settings" />
                 </nav>
 

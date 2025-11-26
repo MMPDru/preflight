@@ -11,6 +11,7 @@ import { fixBleed } from '../lib/bleed-fixer';
 import { ActionRecorder } from '../lib/action-recorder';
 import { fixHistoryManager } from '../lib/fix-history';
 import { Zap, MessageSquare, FileSignature, GitCompare, History, Bot, Mail, Video } from 'lucide-react';
+import { HelpButton } from '../components/HelpButton';
 import { AddAnnotationDialog } from '../components/AddAnnotationDialog';
 import { type DrawingAnnotation } from '../components/CanvasOverlay';
 import { CommentThread, type Comment } from '../components/CommentThread';
@@ -445,6 +446,12 @@ export const Editor = () => {
                         <button className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors text-sm font-medium">
                             Approve Proof
                         </button>
+                        <HelpButton
+                            videoId="annotations-and-markups"
+                            variant="icon"
+                            size="md"
+                            className="bg-surface hover:bg-surface/80 border border-border rounded-lg h-9 w-9 flex items-center justify-center ml-2"
+                        />
                     </div>
                 </div>
 
@@ -520,6 +527,29 @@ export const Editor = () => {
                                     const newResults = await analyzePDF(result.newUrl!);
                                     setChecks(newResults);
                                 }, 500);
+                            }
+                        }
+                    } else if (checkId === 'adv-pdfx') {
+                        if (confirm('Convert to PDF/X-1a compliant file? This will set output intents and metadata.')) {
+                            const beforeUrl = fileUrl;
+                            const { fixPDFX } = await import('../lib/auto-fixer');
+                            const result = await fixPDFX(fileUrl);
+
+                            if (result.success && result.newUrl) {
+                                fixHistoryManager.addFix(
+                                    'compliance',
+                                    'Converted to PDF/X-1a (Simulated)',
+                                    beforeUrl,
+                                    result.newUrl
+                                );
+                                setFileUrl(result.newUrl);
+                                // Re-run analysis
+                                setTimeout(async () => {
+                                    const newResults = await analyzePDF(result.newUrl!);
+                                    setChecks(newResults);
+                                }, 500);
+                            } else {
+                                alert(result.message);
                             }
                         }
                     }

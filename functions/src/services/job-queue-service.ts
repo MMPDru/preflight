@@ -1,494 +1,348 @@
-import Bull from 'bull';
-import { preflightEngine } from '../../../src/lib/pdf-preflight-engine';
-import { autoFixEngine } from '../../../src/lib/pdf-autofix-engine';
-import { emailService } from './email-notification-service';
-import * as admin from 'firebase-admin';
+/**
+ * Job Queue Service
+ * Manages background job processing with priority scheduling and retry logic
+ */
 
-// Types
-export interface JobData {
-    jobId: string;
-    fileName: string;
-    fileUrl: string;
-    customerId: string;
-    customerEmail: string;
-    customerName: string;
-    priority: 'low' | 'medium' | 'high' | 'urgent';
-    autoFix: boolean;
-    notifyOnComplete: boolean;
-}
-
-export interface PreflightJobData extends JobData {
-    type: 'preflight';
-}
-
-export interface AutoFixJobData extends JobData {
-    type: 'autofix';
-    preflightReport: any;
-}
-
-export interface ProofGenerationJobData extends JobData {
-    type: 'proof-generation';
-    pdfBytes: Uint8Array;
-}
-
-export interface EmailJobData {
-    type: 'email';
-    emailType: 'proof-ready' | 'reminder' | 'issue-alert' | 'revision' | 'approval';
-    data: any;
-}
+import { firestore } from 'firebase-admin';
+import type {
+    QueueJob,
+    JobType,
+    JobStatus,
+    JobError,
+    JobProgress,
+    WorkflowEvent,
+} from '../types/workflow-types';
 
 export class JobQueueService {
-    private preflightQueue: Bull.Queue<PreflightJobData>;
-    private autoFixQueue: Bull.Queue<AutoFixJobData>;
-    private proofQueue: Bull.Queue<ProofGenerationJobData>;
-    private emailQueue: Bull.Queue<EmailJobData>;
-    private db = admin.firestore();
+    private db: firestore.Firestore;
+    private processing: Map<string, boolean> = new Map();
 
-    constructor(redisUrl: string = 'redis://localhost:6379') {
-        // Initialize queues
-        this.preflightQueue = new Bull('preflight', redisUrl, {
-            defaultJobOptions: {
-                attempts: 3,
-                backoff: {
-                    type: 'exponential',
-                    delay: 2000
-                },
-                removeOnComplete: 100,
-                removeOnFail: 50
-            }
-        });
-
-        this.autoFixQueue = new Bull('autofix', redisUrl, {
-            defaultJobOptions: {
-                attempts: 2,
-                backoff: {
-                    type: 'exponential',
-                    delay: 3000
-                }
-            }
-        });
-
-        this.proofQueue = new Bull('proof-generation', redisUrl, {
-            defaultJobOptions: {
-                attempts: 2,
-                timeout: 60000 // 1 minute timeout
-            }
-        });
-
-        this.emailQueue = new Bull('email', redisUrl, {
-            defaultJobOptions: {
-                attempts: 5,
-                backoff: {
-                    type: 'exponential',
-                    delay: 1000
-                }
-            }
-        });
-
-        // Set up processors
-        this.setupProcessors();
-
-        // Set up event listeners
-        this.setupEventListeners();
-
-        console.log('✅ Job queue service initialized');
+    constructor(db: firestore.Firestore) {
+        this.db = db;
     }
 
     /**
-     * Set up job processors
+     * Add a job to the queue
      */
-    private setupProcessors() {
-        // Preflight processor
-        this.preflightQueue.process(async (job) => {
-            console.log(`🔍 Processing preflight job: ${job.data.jobId}`);
+    async addJob(
+        type: JobType,
+        payload: any,
+        options?: {
+            priority?: number;
+            maxAttempts?: number;
+            dependencies?: string[];
+            estimatedDuration?: number;
+        }
+    ): Promise<QueueJob> {
+        const now = new Date();
 
-            try {
-                // Update job status
-                await this.updateJobStatus(job.data.jobId, 'analyzing');
-
-                // Download PDF
-                const pdfBytes = await this.downloadFile(job.data.fileUrl);
-
-                // Load PDF
-                await preflightEngine.loadPDF(pdfBytes.buffer);
-
-                // Run analysis
-                const report = await preflightEngine.analyze(job.data.fileName);
-
-                // Save report to Firestore
-                await this.db.collection('preflightReports').doc(job.data.jobId).set({
-                    ...report,
-                    jobId: job.data.jobId,
-                    customerId: job.data.customerId,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                // Update job status
-                await this.updateJobStatus(job.data.jobId, 'analyzed', { reportId: job.data.jobId });
-
-                // If auto-fix is enabled and there are fixable issues
-                if (job.data.autoFix && report.issues.some(i => i.autoFixable)) {
-                    await this.queueAutoFix({
-                        ...job.data,
-                        type: 'autofix',
-                        preflightReport: report
-                    });
-                }
-
-                // Send notification if issues found
-                if (report.issues.length > 0) {
-                    await this.queueEmail({
-                        type: 'email',
-                        emailType: 'issue-alert',
-                        data: {
-                            customerName: job.data.customerName,
-                            customerEmail: job.data.customerEmail,
-                            jobName: job.data.fileName,
-                            issues: report.issues.slice(0, 5), // Top 5 issues
-                            fixRecommendations: report.issues
-                                .filter(i => i.autoFixable)
-                                .map(i => i.recommendation)
-                        }
-                    });
-                }
-
-                return { success: true, report };
-            } catch (error: any) {
-                console.error('❌ Preflight job failed:', error);
-                await this.updateJobStatus(job.data.jobId, 'failed', { error: error.message });
-                throw error;
-            }
-        });
-
-        // Auto-fix processor
-        this.autoFixQueue.process(async (job) => {
-            console.log(`🔧 Processing auto-fix job: ${job.data.jobId}`);
-
-            try {
-                await this.updateJobStatus(job.data.jobId, 'fixing');
-
-                // Download PDF
-                const pdfBytes = await this.downloadFile(job.data.fileUrl);
-
-                // Load PDF
-                await autoFixEngine.loadPDF(pdfBytes);
-
-                // Apply auto-fixes
-                const result = await autoFixEngine.autoFix(job.data.preflightReport);
-
-                // Upload fixed PDF
-                const fixedUrl = await this.uploadFile(
-                    result.pdfBytes,
-                    `fixed/${job.data.jobId}_fixed.pdf`
-                );
-
-                // Save fix report
-                await this.db.collection('autoFixReports').doc(job.data.jobId).set({
-                    jobId: job.data.jobId,
-                    fixedIssues: result.fixedIssues,
-                    remainingIssues: result.remainingIssues,
-                    fixedFileUrl: fixedUrl,
-                    report: result.report,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                await this.updateJobStatus(job.data.jobId, 'fixed', { fixedUrl });
-
-                // Queue proof generation
-                await this.queueProofGeneration({
-                    ...job.data,
-                    type: 'proof-generation',
-                    pdfBytes: result.pdfBytes,
-                    fileUrl: fixedUrl
-                });
-
-                return { success: true, result };
-            } catch (error: any) {
-                console.error('❌ Auto-fix job failed:', error);
-                await this.updateJobStatus(job.data.jobId, 'fix-failed', { error: error.message });
-                throw error;
-            }
-        });
-
-        // Proof generation processor
-        this.proofQueue.process(async (job) => {
-            console.log(`📄 Processing proof generation: ${job.data.jobId}`);
-
-            try {
-                await this.updateJobStatus(job.data.jobId, 'generating-proof');
-
-                // Generate high-res proof images (simplified)
-                const proofUrl = job.data.fileUrl; // In production, generate preview images
-
-                // Create proof record
-                await this.db.collection('proofs').doc(job.data.jobId).set({
-                    jobId: job.data.jobId,
-                    customerId: job.data.customerId,
-                    fileName: job.data.fileName,
-                    proofUrl,
-                    status: 'pending-approval',
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                await this.updateJobStatus(job.data.jobId, 'proof-ready', { proofUrl });
-
-                // Send proof ready notification
-                if (job.data.notifyOnComplete) {
-                    await this.queueEmail({
-                        type: 'email',
-                        emailType: 'proof-ready',
-                        data: {
-                            customerName: job.data.customerName,
-                            customerEmail: job.data.customerEmail,
-                            jobName: job.data.fileName,
-                            proofUrl: `${process.env.FRONTEND_URL}/proof/${job.data.jobId}`
-                        }
-                    });
-                }
-
-                return { success: true, proofUrl };
-            } catch (error: any) {
-                console.error('❌ Proof generation failed:', error);
-                await this.updateJobStatus(job.data.jobId, 'proof-failed', { error: error.message });
-                throw error;
-            }
-        });
-
-        // Email processor
-        this.emailQueue.process(async (job) => {
-            console.log(`📧 Processing email: ${job.data.emailType}`);
-
-            try {
-                switch (job.data.emailType) {
-                    case 'proof-ready':
-                        await emailService.sendProofReadyNotification(job.data.data);
-                        break;
-                    case 'reminder':
-                        await emailService.sendReminderNotification(job.data.data);
-                        break;
-                    case 'issue-alert':
-                        await emailService.sendIssueAlert(job.data.data);
-                        break;
-                    case 'revision':
-                        await emailService.sendRevisionNotification(job.data.data);
-                        break;
-                    case 'approval':
-                        await emailService.sendApprovalConfirmation(job.data.data);
-                        break;
-                }
-
-                return { success: true };
-            } catch (error: any) {
-                console.error('❌ Email job failed:', error);
-                throw error;
-            }
-        });
-    }
-
-    /**
-     * Set up event listeners
-     */
-    private setupEventListeners() {
-        // Preflight queue events
-        this.preflightQueue.on('completed', (job, result) => {
-            console.log(`✅ Preflight job completed: ${job.data.jobId}`);
-        });
-
-        this.preflightQueue.on('failed', (job, error) => {
-            console.error(`❌ Preflight job failed: ${job?.data.jobId}`, error);
-        });
-
-        // Auto-fix queue events
-        this.autoFixQueue.on('completed', (job, result) => {
-            console.log(`✅ Auto-fix job completed: ${job.data.jobId}`);
-        });
-
-        this.autoFixQueue.on('failed', (job, error) => {
-            console.error(`❌ Auto-fix job failed: ${job?.data.jobId}`, error);
-        });
-
-        // Email queue events
-        this.emailQueue.on('completed', (job) => {
-            console.log(`✅ Email sent: ${job.data.emailType}`);
-        });
-
-        this.emailQueue.on('failed', (job, error) => {
-            console.error(`❌ Email failed: ${job?.data.emailType}`, error);
-        });
-    }
-
-    /**
-     * Queue preflight analysis
-     */
-    async queuePreflight(data: PreflightJobData): Promise<Bull.Job<PreflightJobData>> {
-        const priority = this.getPriorityValue(data.priority);
-
-        return await this.preflightQueue.add(data, {
-            priority,
-            jobId: data.jobId
-        });
-    }
-
-    /**
-     * Queue auto-fix
-     */
-    async queueAutoFix(data: AutoFixJobData): Promise<Bull.Job<AutoFixJobData>> {
-        const priority = this.getPriorityValue(data.priority);
-
-        return await this.autoFixQueue.add(data, {
-            priority,
-            jobId: data.jobId
-        });
-    }
-
-    /**
-     * Queue proof generation
-     */
-    async queueProofGeneration(data: ProofGenerationJobData): Promise<Bull.Job<ProofGenerationJobData>> {
-        const priority = this.getPriorityValue(data.priority);
-
-        return await this.proofQueue.add(data, {
-            priority,
-            jobId: data.jobId
-        });
-    }
-
-    /**
-     * Queue email
-     */
-    async queueEmail(data: EmailJobData): Promise<Bull.Job<EmailJobData>> {
-        return await this.emailQueue.add(data);
-    }
-
-    /**
-     * Get priority value
-     */
-    private getPriorityValue(priority: string): number {
-        const priorities: Record<string, number> = {
-            urgent: 1,
-            high: 2,
-            medium: 3,
-            low: 4
+        const job: QueueJob = {
+            id: this.db.collection('queue-jobs').doc().id,
+            type,
+            payload,
+            priority: options?.priority || 5,
+            status: 'queued',
+            attempts: 0,
+            maxAttempts: options?.maxAttempts || 3,
+            dependencies: options?.dependencies || [],
+            createdAt: now,
+            estimatedDuration: options?.estimatedDuration,
         };
-        return priorities[priority] || 3;
+
+        await this.db.collection('queue-jobs').doc(job.id).set(job);
+
+        // Log event
+        await this.logEvent({
+            id: this.db.collection('workflow-events').doc().id,
+            type: 'job-queued',
+            jobId: job.id,
+            data: { type, priority: job.priority },
+            timestamp: now,
+        });
+
+        return job;
     }
 
     /**
-     * Update job status in Firestore
+     * Get next job to process
      */
-    private async updateJobStatus(jobId: string, status: string, data: any = {}): Promise<void> {
-        await this.db.collection('jobs').doc(jobId).update({
-            status,
-            ...data,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    async getNextJob(): Promise<QueueJob | null> {
+        // Get jobs that are queued and have no unmet dependencies
+        const snapshot = await this.db
+            .collection('queue-jobs')
+            .where('status', '==', 'queued')
+            .orderBy('priority', 'desc')
+            .orderBy('createdAt', 'asc')
+            .limit(10)
+            .get();
+
+        for (const doc of snapshot.docs) {
+            const job = doc.data() as QueueJob;
+
+            // Check if already being processed
+            if (this.processing.get(job.id)) {
+                continue;
+            }
+
+            // Check dependencies
+            if (job.dependencies && job.dependencies.length > 0) {
+                const dependenciesMet = await this.checkDependencies(job.dependencies);
+                if (!dependenciesMet) {
+                    continue;
+                }
+            }
+
+            // Mark as processing
+            this.processing.set(job.id, true);
+            return job;
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if all dependencies are completed
+     */
+    private async checkDependencies(dependencies: string[]): Promise<boolean> {
+        for (const depId of dependencies) {
+            const depDoc = await this.db.collection('queue-jobs').doc(depId).get();
+            if (!depDoc.exists) {
+                return false;
+            }
+
+            const depJob = depDoc.data() as QueueJob;
+            if (depJob.status !== 'completed') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Start processing a job
+     */
+    async startJob(jobId: string): Promise<void> {
+        const now = new Date();
+
+        await this.db.collection('queue-jobs').doc(jobId).update({
+            status: 'processing',
+            startedAt: now,
+        });
+
+        await this.logEvent({
+            id: this.db.collection('workflow-events').doc().id,
+            type: 'job-started',
+            jobId,
+            data: {},
+            timestamp: now,
         });
     }
 
     /**
-     * Download file from URL
+     * Update job progress
      */
-    private async downloadFile(url: string): Promise<Uint8Array> {
-        // In production, download from Firebase Storage or S3
-        // For now, return placeholder
-        return new Uint8Array();
+    async updateProgress(jobId: string, progress: number, message?: string): Promise<void> {
+        await this.db.collection('queue-jobs').doc(jobId).update({
+            progress,
+        });
+
+        // Publish progress update (would use WebSocket in production)
+        const progressUpdate: JobProgress = {
+            jobId,
+            progress,
+            message,
+        };
+
+        // Store in separate collection for real-time updates
+        await this.db.collection('job-progress').doc(jobId).set(progressUpdate);
     }
 
     /**
-     * Upload file to storage
+     * Complete a job successfully
      */
-    private async uploadFile(bytes: Uint8Array, path: string): Promise<string> {
-        // In production, upload to Firebase Storage or S3
-        // For now, return placeholder URL
-        return `https://storage.example.com/${path}`;
+    async completeJob(jobId: string, result?: any): Promise<void> {
+        const now = new Date();
+        const jobDoc = await this.db.collection('queue-jobs').doc(jobId).get();
+        const job = jobDoc.data() as QueueJob;
+
+        const actualDuration = job.startedAt ? now.getTime() - job.startedAt.getTime() : 0;
+
+        await this.db.collection('queue-jobs').doc(jobId).update({
+            status: 'completed',
+            completedAt: now,
+            result,
+            actualDuration,
+            progress: 100,
+        });
+
+        this.processing.delete(jobId);
+
+        await this.logEvent({
+            id: this.db.collection('workflow-events').doc().id,
+            type: 'job-completed',
+            jobId,
+            data: { duration: actualDuration },
+            timestamp: now,
+        });
+    }
+
+    /**
+     * Fail a job
+     */
+    async failJob(jobId: string, error: Error, recoverable: boolean = true): Promise<void> {
+        const now = new Date();
+        const jobDoc = await this.db.collection('queue-jobs').doc(jobId).get();
+        const job = jobDoc.data() as QueueJob;
+
+        const jobError: JobError = {
+            message: error.message,
+            stack: error.stack,
+            timestamp: now,
+            recoverable,
+        };
+
+        const attempts = job.attempts + 1;
+        const shouldRetry = recoverable && attempts < job.maxAttempts;
+
+        await this.db.collection('queue-jobs').doc(jobId).update({
+            status: shouldRetry ? 'retrying' : 'failed',
+            attempts,
+            error: jobError,
+        });
+
+        this.processing.delete(jobId);
+
+        if (shouldRetry) {
+            // Requeue with exponential backoff
+            const backoffMs = Math.min(1000 * Math.pow(2, attempts), 60000);
+            setTimeout(async () => {
+                await this.db.collection('queue-jobs').doc(jobId).update({
+                    status: 'queued',
+                });
+            }, backoffMs);
+        }
+
+        await this.logEvent({
+            id: this.db.collection('workflow-events').doc().id,
+            type: 'job-failed',
+            jobId,
+            data: { error: error.message, attempts, willRetry: shouldRetry },
+            timestamp: now,
+        });
+    }
+
+    /**
+     * Cancel a job
+     */
+    async cancelJob(jobId: string): Promise<void> {
+        await this.db.collection('queue-jobs').doc(jobId).update({
+            status: 'cancelled',
+            completedAt: new Date(),
+        });
+
+        this.processing.delete(jobId);
+    }
+
+    /**
+     * Get job status
+     */
+    async getJobStatus(jobId: string): Promise<QueueJob | null> {
+        const doc = await this.db.collection('queue-jobs').doc(jobId).get();
+        return doc.exists ? (doc.data() as QueueJob) : null;
+    }
+
+    /**
+     * Get job progress
+     */
+    async getJobProgress(jobId: string): Promise<JobProgress | null> {
+        const doc = await this.db.collection('job-progress').doc(jobId).get();
+        return doc.exists ? (doc.data() as JobProgress) : null;
     }
 
     /**
      * Get queue statistics
      */
-    async getQueueStats(): Promise<any> {
-        const [
-            preflightCounts,
-            autoFixCounts,
-            proofCounts,
-            emailCounts
-        ] = await Promise.all([
-            this.preflightQueue.getJobCounts(),
-            this.autoFixQueue.getJobCounts(),
-            this.proofQueue.getJobCounts(),
-            this.emailQueue.getJobCounts()
-        ]);
+    async getQueueStats(): Promise<{
+        queued: number;
+        processing: number;
+        completed: number;
+        failed: number;
+        byType: Record<JobType, number>;
+    }> {
+        const snapshot = await this.db.collection('queue-jobs').get();
 
-        return {
-            preflight: preflightCounts,
-            autoFix: autoFixCounts,
-            proof: proofCounts,
-            email: emailCounts
+        const stats = {
+            queued: 0,
+            processing: 0,
+            completed: 0,
+            failed: 0,
+            byType: {} as Record<JobType, number>,
         };
+
+        snapshot.forEach(doc => {
+            const job = doc.data() as QueueJob;
+
+            switch (job.status) {
+                case 'queued':
+                    stats.queued++;
+                    break;
+                case 'processing':
+                    stats.processing++;
+                    break;
+                case 'completed':
+                    stats.completed++;
+                    break;
+                case 'failed':
+                    stats.failed++;
+                    break;
+            }
+
+            stats.byType[job.type] = (stats.byType[job.type] || 0) + 1;
+        });
+
+        return stats;
     }
 
     /**
-     * Pause queue
+     * Clean up old completed jobs
      */
-    async pauseQueue(queueName: string): Promise<void> {
-        const queue = this.getQueue(queueName);
-        await queue.pause();
-        console.log(`⏸️ Queue paused: ${queueName}`);
+    async cleanupOldJobs(olderThanDays: number = 30): Promise<number> {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+        const snapshot = await this.db
+            .collection('queue-jobs')
+            .where('status', 'in', ['completed', 'failed', 'cancelled'])
+            .where('completedAt', '<', cutoffDate)
+            .get();
+
+        const batch = this.db.batch();
+        snapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        await batch.commit();
+        return snapshot.size;
     }
 
     /**
-     * Resume queue
+     * Retry a failed job
      */
-    async resumeQueue(queueName: string): Promise<void> {
-        const queue = this.getQueue(queueName);
-        await queue.resume();
-        console.log(`▶️ Queue resumed: ${queueName}`);
+    async retryJob(jobId: string): Promise<void> {
+        await this.db.collection('queue-jobs').doc(jobId).update({
+            status: 'queued',
+            attempts: 0,
+            error: null,
+        });
     }
 
     /**
-     * Get queue by name
+     * Log workflow event
      */
-    private getQueue(name: string): Bull.Queue {
-        switch (name) {
-            case 'preflight':
-                return this.preflightQueue;
-            case 'autofix':
-                return this.autoFixQueue;
-            case 'proof':
-                return this.proofQueue;
-            case 'email':
-                return this.emailQueue;
-            default:
-                throw new Error(`Unknown queue: ${name}`);
-        }
-    }
-
-    /**
-     * Clean completed jobs
-     */
-    async cleanQueues(): Promise<void> {
-        await Promise.all([
-            this.preflightQueue.clean(24 * 3600 * 1000), // 24 hours
-            this.autoFixQueue.clean(24 * 3600 * 1000),
-            this.proofQueue.clean(24 * 3600 * 1000),
-            this.emailQueue.clean(24 * 3600 * 1000)
-        ]);
-        console.log('🧹 Queues cleaned');
+    private async logEvent(event: WorkflowEvent): Promise<void> {
+        await this.db.collection('workflow-events').doc(event.id).set(event);
     }
 }
 
-// Export singleton
-let queueService: JobQueueService | null = null;
-
-export function initializeJobQueue(redisUrl?: string): JobQueueService {
-    if (!queueService) {
-        queueService = new JobQueueService(redisUrl);
-    }
-    return queueService;
-}
-
-export function getJobQueue(): JobQueueService {
-    if (!queueService) {
-        throw new Error('Job queue not initialized');
-    }
-    return queueService;
-}
+export const jobQueueService = new JobQueueService(firestore());

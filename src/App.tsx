@@ -9,6 +9,7 @@ import { Editor } from './pages/Editor';
 import { Batch } from './pages/Batch';
 import { Settings } from './pages/Settings';
 import { Assets } from './pages/Assets';
+import { UserManagement } from './pages/UserManagement';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
@@ -16,7 +17,7 @@ import { GuestReviewSession } from './pages/GuestReviewSession';
 
 // Components
 import { AgentDashboard } from './components/AgentDashboard';
-import { TrainingCenter } from './components/TrainingCenter';
+import { TrainingCenter } from './pages/TrainingCenter';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { ReviewSessionManager } from './components/ReviewSessionManager';
 import { ReviewSession } from './pages/ReviewSession';
@@ -55,6 +56,7 @@ function App() {
             <Route path="batch" element={<Batch />} />
             <Route path="settings" element={<Settings />} />
             <Route path="assets" element={<Assets />} />
+            <Route path="users" element={<UserManagement />} />
             <Route
               path="agent"
               element={

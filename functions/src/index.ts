@@ -1,422 +1,864 @@
+import * as functions from 'firebase-functions';
+import * as admin from 'firebase-admin';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
-import { createServer } from 'http';
-import { initializeWebSocket } from './services/websocket-service';
-import { getAIService } from './services/ai-support-route';
-import { getDocumentationService } from './services/auto-documentation';
-import * as admin from 'firebase-admin';
+import { pdfFixer } from './services/pdf-fixer';
+import {
+    getApprovalService,
+    getJobQueueService,
+    getNotificationService,
+    getRoutingEngine,
+    getPermissionService,
+    getAuditService,
+} from './services/service-instances';
+import { queueWorker } from './workers/queue-worker';
+import busboy from 'busboy';
+import * as path from 'path';
+import * as os from 'os';
+import * as fs from 'fs';
 
 // Initialize Firebase Admin
-admin.initializeApp({
-    credential: admin.credential.applicationDefault()
-});
-
+admin.initializeApp();
 const db = admin.firestore();
 
 // Create Express app
 const app: Express = express();
-const httpServer = createServer(app);
-const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-    credentials: true
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cors({ origin: true })); // Allow all origins for now
+app.use(express.json({ limit: '50mb' })); // Increase limit for PDFs
 
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+// ==================== PDF ANALYSIS ROUTE ====================
 
-// Request logging
-app.use((req: Request, res: Response, next: NextFunction) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-    next();
-});
-
-// Authentication middleware
-const authenticateUser = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const token = authHeader.split('Bearer ')[1];
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        req.user = decodedToken;
-        next();
-    } catch (error) {
-        res.status(401).json({ error: 'Invalid token' });
+app.post('/api/v1/analyze-pdf', async (req: Request, res: Response) => {
+    if (req.method !== 'POST') {
+        return res.status(405).end();
     }
-};
 
-// Initialize WebSocket
-const wsService = initializeWebSocket(httpServer, process.env.REDIS_URL);
+    const busboyInstance = busboy({ headers: req.headers });
+    const tmpdir = os.tmpdir();
+    const uploads: { [key: string]: string } = {};
+    const fileWrites: Promise<void>[] = [];
 
-// ==================== ROUTES ====================
+    busboyInstance.on('file', (fieldname, file, info) => {
+        const filepath = path.join(tmpdir, info.filename);
+        uploads[fieldname] = filepath;
 
-// Health check
-app.get('/health', (req: Request, res: Response) => {
-    res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        websocket: {
-            connections: wsService.getTotalConnections(),
-            sessions: wsService.getActiveSessionsCount()
+        const writeStream = fs.createWriteStream(filepath);
+        file.pipe(writeStream);
+
+        const promise = new Promise<void>((resolve, reject) => {
+            file.on('end', () => {
+                writeStream.end();
+            });
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+        fileWrites.push(promise);
+    });
+
+    busboyInstance.on('finish', async () => {
+        await Promise.all(fileWrites);
+
+        try {
+            const filePath = uploads['file'];
+            if (!filePath) {
+                return res.status(400).json({ error: 'No file uploaded' });
+            }
+
+            const fileBuffer = fs.readFileSync(filePath);
+
+            // Import analyzer dynamically
+            const { pdfAnalyzer } = await import('./services/pdf-analyzer');
+            const analysis = await pdfAnalyzer.analyzeDocument(fileBuffer);
+
+            // Cleanup
+            fs.unlinkSync(filePath);
+
+            res.json({ success: true, analysis });
+        } catch (error: any) {
+            console.error('PDF Analysis Error:', error);
+            res.status(500).json({ error: error.message });
         }
     });
+
+    if ((req as any).rawBody) {
+        busboyInstance.end((req as any).rawBody);
+    } else {
+        req.pipe(busboyInstance);
+    }
 });
 
-// ==================== SUPPORT ROUTING ====================
+// ==================== PDF FIXING ROUTE (ENHANCED) ====================
 
-// Get route recommendation
-app.post('/api/v1/support/route', authenticateUser, async (req: Request, res: Response) => {
-    try {
-        const { issue, urgency, customerHistory } = req.body;
+app.post('/api/v1/fix-pdf', async (req: Request, res: Response) => {
+    if (req.method !== 'POST') {
+        return res.status(405).end();
+    }
 
-        const aiService = getAIService();
-        const recommendation = await aiService.recommendRoute({
-            issue,
-            urgency,
-            customerHistory
+    const busboyInstance = busboy({ headers: req.headers });
+    const tmpdir = os.tmpdir();
+    const uploads: { [key: string]: string } = {};
+    const fileWrites: Promise<void>[] = [];
+    let fixTypes: string[] = [];
+    let options: any = {};
+
+    busboyInstance.on('field', (fieldname, val) => {
+        if (fieldname === 'fixTypes') {
+            try {
+                fixTypes = JSON.parse(val);
+            } catch (e) {
+                fixTypes = [val];
+            }
+        } else if (fieldname === 'options') {
+            try {
+                options = JSON.parse(val);
+            } catch (e) {
+                options = {};
+            }
+        }
+    });
+
+    busboyInstance.on('file', (fieldname, file, info) => {
+        const filepath = path.join(tmpdir, info.filename);
+        uploads[fieldname] = filepath;
+
+        const writeStream = fs.createWriteStream(filepath);
+        file.pipe(writeStream);
+
+        const promise = new Promise<void>((resolve, reject) => {
+            file.on('end', () => {
+                writeStream.end();
+            });
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
         });
+        fileWrites.push(promise);
+    });
 
-        // Log recommendation
-        await db.collection('supportRouteRecommendations').add({
-            userId: req.user.uid,
-            issue,
-            urgency,
-            recommendation,
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
-        });
+    busboyInstance.on('finish', async () => {
+        await Promise.all(fileWrites);
 
-        res.json(recommendation);
-    } catch (error: any) {
-        console.error('Route recommendation error:', error);
-        res.status(500).json({ error: error.message });
+        try {
+            const filePath = uploads['file'];
+            if (!filePath) {
+                return res.status(400).json({ error: 'No file uploaded' });
+            }
+
+            const fileBuffer = fs.readFileSync(filePath);
+
+            // Process PDF with fixes and get analysis
+            const result = await pdfFixer.processPdfWithAnalysis(fileBuffer, fixTypes, options);
+
+            // Upload fixed PDF to Firebase Storage
+            const bucket = admin.storage().bucket();
+            const filename = `fixed/${Date.now()}_fixed.pdf`;
+            const file = bucket.file(filename);
+
+            await file.save(result.buffer, {
+                metadata: { contentType: 'application/pdf' }
+            });
+
+            await file.makePublic();
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+
+            // Cleanup
+            fs.unlinkSync(filePath);
+
+            res.json({
+                success: true,
+                url: publicUrl,
+                analysis: result.analysis,
+                fixesApplied: fixTypes,
+            });
+        } catch (error: any) {
+            console.error('PDF Fix Error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    if ((req as any).rawBody) {
+        busboyInstance.end((req as any).rawBody);
+    } else {
+        req.pipe(busboyInstance);
     }
 });
 
-// Analyze sentiment
-app.post('/api/v1/support/sentiment', authenticateUser, async (req: Request, res: Response) => {
+// ==================== EXISTING ROUTES (Simplified) ====================
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// ==================== APPROVAL WORKFLOW ROUTES ====================
+
+// Create approval chain
+app.post('/api/v1/approvals/create', async (req: Request, res: Response) => {
     try {
-        const { message } = req.body;
+        const { jobId, customerId, stages } = req.body;
 
-        const aiService = getAIService();
-        const sentiment = await aiService.analyzeSentiment(message);
+        if (!jobId || !customerId || !stages) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
 
-        res.json(sentiment);
+        const chain = await getApprovalService().createApprovalChain(jobId, customerId, stages);
+
+        res.json({ success: true, chain });
     } catch (error: any) {
+        console.error('Error creating approval chain:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Categorize request
-app.post('/api/v1/support/categorize', authenticateUser, async (req: Request, res: Response) => {
-    try {
-        const { issue } = req.body;
-
-        const aiService = getAIService();
-        const category = await aiService.categorize(issue);
-
-        res.json(category);
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Generate suggestions
-app.post('/api/v1/support/suggestions', authenticateUser, async (req: Request, res: Response) => {
-    try {
-        const { context, messageHistory } = req.body;
-
-        const aiService = getAIService();
-        const suggestions = await aiService.generateSuggestions(context, messageHistory);
-
-        res.json({ suggestions });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// ==================== ANNOTATIONS ====================
-
-// Get annotations for session
-app.get('/api/v1/annotations/:sessionId', authenticateUser, async (req: Request, res: Response) => {
-    try {
-        const { sessionId } = req.params;
-
-        const snapshot = await db.collection('annotations')
-            .where('sessionId', '==', sessionId)
-            .orderBy('timestamp', 'asc')
-            .get();
-
-        const annotations = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-
-        res.json({ annotations });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Save annotation
-app.post('/api/v1/annotations', authenticateUser, async (req: Request, res: Response) => {
-    try {
-        const annotation = {
-            ...req.body,
-            userId: req.user.uid,
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
-        };
-
-        const docRef = await db.collection('annotations').add(annotation);
-
-        res.json({ id: docRef.id, ...annotation });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Delete annotation
-app.delete('/api/v1/annotations/:id', authenticateUser, async (req: Request, res: Response) => {
+// Submit approval
+app.post('/api/v1/approvals/:id/approve', async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
+        const { userId, userName, decision, feedback, partialApprovalPages } = req.body;
 
-        await db.collection('annotations').doc(id).delete();
+        if (!userId || !userName || !decision) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
 
-        res.json({ success: true });
+        const chain = await getApprovalService().submitApproval(
+            id,
+            userId,
+            userName,
+            decision,
+            feedback,
+            partialApprovalPages
+        );
+
+        res.json({ success: true, chain });
     } catch (error: any) {
+        console.error('Error submitting approval:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ==================== ANALYTICS ====================
-
-// Get session analytics
-app.get('/api/v1/analytics/sessions', authenticateUser, async (req: Request, res: Response) => {
+// Reject approval
+app.post('/api/v1/approvals/:id/reject', async (req: Request, res: Response) => {
     try {
-        const { startDate, endDate, channel } = req.query;
+        const { id } = req.params;
+        const { userId, userName, feedback } = req.body;
 
-        let query = db.collection('supportSessions').orderBy('startTime', 'desc');
-
-        if (startDate) {
-            query = query.where('startTime', '>=', new Date(startDate as string));
-        }
-        if (endDate) {
-            query = query.where('startTime', '<=', new Date(endDate as string));
-        }
-        if (channel) {
-            query = query.where('type', '==', channel);
+        if (!userId || !userName) {
+            return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const snapshot = await query.limit(100).get();
-        const sessions = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        const chain = await getApprovalService().submitApproval(
+            id,
+            userId,
+            userName,
+            'rejected',
+            feedback
+        );
 
-        // Calculate metrics
-        const metrics = {
-            totalSessions: sessions.length,
-            avgDuration: sessions.reduce((sum, s: any) => sum + (s.duration || 0), 0) / sessions.length,
-            resolutionRate: sessions.filter((s: any) => s.resolution === 'resolved').length / sessions.length,
-            avgSatisfaction: sessions.reduce((sum, s: any) => sum + (s.satisfaction || 0), 0) / sessions.length,
-            channelBreakdown: {} as any
-        };
-
-        // Channel breakdown
-        sessions.forEach((s: any) => {
-            if (!metrics.channelBreakdown[s.type]) {
-                metrics.channelBreakdown[s.type] = { count: 0, avgDuration: 0, resolution: 0 };
-            }
-            metrics.channelBreakdown[s.type].count++;
-            metrics.channelBreakdown[s.type].avgDuration += s.duration || 0;
-        });
-
-        res.json({ sessions, metrics });
+        res.json({ success: true, chain });
     } catch (error: any) {
+        console.error('Error rejecting approval:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ==================== TRAINING ====================
-
-// Get training modules
-app.get('/api/v1/training/modules', authenticateUser, async (req: Request, res: Response) => {
-    try {
-        const { category } = req.query;
-
-        let query = db.collection('trainingModules').where('status', '==', 'published');
-
-        if (category) {
-            query = query.where('category', '==', category);
-        }
-
-        const snapshot = await query.get();
-        const modules = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-
-        res.json({ modules });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get user progress
-app.get('/api/v1/training/progress/:userId', authenticateUser, async (req: Request, res: Response) => {
+// Get pending approvals for user
+app.get('/api/v1/approvals/pending/:userId', async (req: Request, res: Response) => {
     try {
         const { userId } = req.params;
 
-        // Verify user can access this data
-        if (userId !== req.user.uid && req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
+        const approvals = await getApprovalService().getPendingApprovals(userId);
 
-        const snapshot = await db.collection('userProgress')
-            .where('userId', '==', userId)
-            .get();
-
-        const progress = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-
-        res.json({ progress });
+        res.json({ success: true, approvals });
     } catch (error: any) {
+        console.error('Error getting pending approvals:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Update user progress
-app.post('/api/v1/training/progress', authenticateUser, async (req: Request, res: Response) => {
+// Get approval chain
+app.get('/api/v1/approvals/:id', async (req: Request, res: Response) => {
     try {
-        const progress = {
-            ...req.body,
-            userId: req.user.uid,
-            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-        };
+        const { id } = req.params;
 
-        const docRef = await db.collection('userProgress').add(progress);
+        const chain = await getApprovalService().getApprovalChain(id);
 
-        res.json({ id: docRef.id, ...progress });
+        if (!chain) {
+            return res.status(404).json({ error: 'Approval chain not found' });
+        }
+
+        res.json({ success: true, chain });
     } catch (error: any) {
+        console.error('Error getting approval chain:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ==================== DOCUMENTATION ====================
-
-// Generate documentation for commit
-app.post('/api/v1/documentation/generate', authenticateUser, async (req: Request, res: Response) => {
+// Get approval history
+app.get('/api/v1/approvals/:id/history', async (req: Request, res: Response) => {
     try {
-        // Admin only
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Forbidden' });
+        const { id } = req.params;
+
+        const chain = await getApprovalService().getApprovalChain(id);
+        if (!chain) {
+            return res.status(404).json({ error: 'Approval chain not found' });
         }
 
-        const { commitHash } = req.body;
+        const history = await getApprovalService().getApprovalHistory(chain.jobId);
 
-        const docService = getDocumentationService();
-        const changes = await docService.detectChanges(commitHash);
-        const documentation = await docService.generateDocumentation(changes);
+        res.json({ success: true, history });
+    } catch (error: any) {
+        console.error('Error getting approval history:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
-        // Save to database
-        await db.collection('documentation').add({
-            ...documentation,
-            commitHash: changes.commitHash,
-            autoGenerated: true,
-            reviewed: false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
+// ==================== JOB QUEUE ROUTES ====================
+
+// Add job to queue
+app.post('/api/v1/queue/add', async (req: Request, res: Response) => {
+    try {
+        const { type, payload, priority, maxAttempts, dependencies } = req.body;
+
+        if (!type || !payload) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const job = await getJobQueueService().addJob(type, payload, {
+            priority,
+            maxAttempts,
+            dependencies,
         });
 
-        res.json({ documentation, changes });
+        res.json({ success: true, job });
     } catch (error: any) {
+        console.error('Error adding job to queue:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Get documentation
-app.get('/api/v1/documentation', authenticateUser, async (req: Request, res: Response) => {
+// Get job status
+app.get('/api/v1/queue/status/:id', async (req: Request, res: Response) => {
     try {
-        const { type, version } = req.query;
+        const { id } = req.params;
 
-        let query = db.collection('documentation').orderBy('createdAt', 'desc');
+        const job = await getJobQueueService().getJobStatus(id);
 
-        if (type) {
-            query = query.where('type', '==', type);
-        }
-        if (version) {
-            query = query.where('releaseNotes.version', '==', version);
+        if (!job) {
+            return res.status(404).json({ error: 'Job not found' });
         }
 
-        const snapshot = await query.limit(50).get();
-        const docs = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-
-        res.json({ documentation: docs });
+        res.json({ success: true, job });
     } catch (error: any) {
+        console.error('Error getting job status:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
-// ==================== ERROR HANDLING ====================
+// Get job progress
+app.get('/api/v1/queue/progress/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
 
-// 404 handler
-app.use((req: Request, res: Response) => {
-    res.status(404).json({ error: 'Not found' });
+        const progress = await getJobQueueService().getJobProgress(id);
+
+        if (!progress) {
+            return res.status(404).json({ error: 'Job progress not found' });
+        }
+
+        res.json({ success: true, progress });
+    } catch (error: any) {
+        console.error('Error getting job progress:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// Error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-    console.error('Error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+// Get queue statistics
+app.get('/api/v1/queue/stats', async (req: Request, res: Response) => {
+    try {
+        const stats = await getJobQueueService().getQueueStats();
+
+        res.json({ success: true, stats });
+    } catch (error: any) {
+        console.error('Error getting queue stats:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// ==================== START SERVER ====================
+// Retry failed job
+app.post('/api/v1/queue/retry/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
 
-httpServer.listen(PORT, () => {
-    console.log(`
-╔════════════════════════════════════════════════════════════╗
-║                                                            ║
-║   🚀 PreFlight Pro Backend Server                         ║
-║                                                            ║
-║   Server:     http://localhost:${PORT}                        ║
-║   WebSocket:  ws://localhost:${PORT}                          ║
-║   Status:     ✅ Running                                   ║
-║                                                            ║
-║   Services:                                                ║
-║   - API Gateway         ✅                                 ║
-║   - WebSocket Server    ✅                                 ║
-║   - AI Services         ✅                                 ║
-║   - Auto-Documentation  ✅                                 ║
-║                                                            ║
-╚════════════════════════════════════════════════════════════╝
-  `);
+        await getJobQueueService().retryJob(id);
+
+        res.json({ success: true, message: 'Job queued for retry' });
+    } catch (error: any) {
+        console.error('Error retrying job:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully...');
-    httpServer.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
+// Cancel job
+app.post('/api/v1/queue/cancel/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        await getJobQueueService().cancelJob(id);
+
+        res.json({ success: true, message: 'Job cancelled' });
+    } catch (error: any) {
+        console.error('Error cancelling job:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
-export default app;
+// ==================== NOTIFICATION ROUTES ====================
+
+// Send notification
+app.post('/api/v1/notifications/send', async (req: Request, res: Response) => {
+    try {
+        const { userId, type, title, message, options } = req.body;
+
+        if (!userId || !type || !title || !message) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const notification = await getNotificationService().sendNotification(
+            userId,
+            type,
+            title,
+            message,
+            options
+        );
+
+        res.json({ success: true, notification });
+    } catch (error: any) {
+        console.error('Error sending notification:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get user notifications
+app.get('/api/v1/notifications/user/:userId', async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const { unreadOnly, limit } = req.query;
+
+        const notifications = await getNotificationService().getUserNotifications(userId, {
+            unreadOnly: unreadOnly === 'true',
+            limit: limit ? parseInt(limit as string) : undefined,
+        });
+
+        res.json({ success: true, notifications });
+    } catch (error: any) {
+        console.error('Error getting notifications:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Mark notification as read
+app.post('/api/v1/notifications/:id/read', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        await getNotificationService().markAsRead(id);
+
+        res.json({ success: true, message: 'Notification marked as read' });
+    } catch (error: any) {
+        console.error('Error marking notification as read:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Mark all notifications as read
+app.post('/api/v1/notifications/user/:userId/read-all', async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params;
+
+        await getNotificationService().markAllAsRead(userId);
+
+        res.json({ success: true, message: 'All notifications marked as read' });
+    } catch (error: any) {
+        console.error('Error marking all notifications as read:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get/Update notification preferences
+app.get('/api/v1/notifications/preferences/:userId', async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params;
+
+        const preferences = await getNotificationService().getUserPreferences(userId);
+
+        res.json({ success: true, preferences });
+    } catch (error: any) {
+        console.error('Error getting notification preferences:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/v1/notifications/preferences/:userId', async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const preferences = req.body;
+
+        await getNotificationService().updateUserPreferences(userId, preferences);
+
+        res.json({ success: true, message: 'Preferences updated' });
+    } catch (error: any) {
+        console.error('Error updating notification preferences:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== ROUTING ROUTES ====================
+
+// Create routing rule
+app.post('/api/v1/routing/rules', async (req: Request, res: Response) => {
+    try {
+        const rule = await getRoutingEngine().createRule(req.body);
+
+        res.json({ success: true, rule });
+    } catch (error: any) {
+        console.error('Error creating routing rule:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get routing rules
+app.get('/api/v1/routing/rules', async (req: Request, res: Response) => {
+    try {
+        const { customerId } = req.query;
+
+        const rules = await getRoutingEngine().getRules(customerId as string);
+
+        res.json({ success: true, rules });
+    } catch (error: any) {
+        console.error('Error getting routing rules:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update routing rule
+app.put('/api/v1/routing/rules/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        await getRoutingEngine().updateRule(id, req.body);
+
+        res.json({ success: true, message: 'Rule updated' });
+    } catch (error: any) {
+        console.error('Error updating routing rule:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete routing rule
+app.delete('/api/v1/routing/rules/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        await getRoutingEngine().deleteRule(id);
+
+        res.json({ success: true, message: 'Rule deleted' });
+    } catch (error: any) {
+        console.error('Error deleting routing rule:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Auto-assign approvers
+app.post('/api/v1/routing/auto-assign', async (req: Request, res: Response) => {
+    try {
+        const { customerId, jobContext } = req.body;
+
+        if (!customerId || !jobContext) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const approvers = await getRoutingEngine().autoAssignApprovers(customerId, jobContext);
+
+        res.json({ success: true, approvers });
+    } catch (error: any) {
+        console.error('Error auto-assigning approvers:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== PERMISSION ROUTES ====================
+
+// Create custom role
+app.post('/api/v1/permissions/roles', async (req: Request, res: Response) => {
+    try {
+        const role = await getPermissionService().createRole(req.body);
+
+        // Log the action
+        await getAuditService().log(
+            req.body.createdBy || 'system',
+            req.body.createdBy || 'system',
+            'create',
+            'roles',
+            role.id,
+            { severity: 'medium' }
+        );
+
+        res.json({ success: true, role });
+    } catch (error: any) {
+        console.error('Error creating role:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get all roles
+app.get('/api/v1/permissions/roles', async (req: Request, res: Response) => {
+    try {
+        const roles = await getPermissionService().getRoles();
+        res.json({ success: true, roles });
+    } catch (error: any) {
+        console.error('Error getting roles:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update role
+app.put('/api/v1/permissions/roles/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        await getPermissionService().updateRole(id, req.body);
+
+        // Log the action
+        await getAuditService().log(
+            req.body.updatedBy || 'system',
+            req.body.updatedBy || 'system',
+            'update',
+            'roles',
+            id,
+            { severity: 'medium' }
+        );
+
+        res.json({ success: true, message: 'Role updated' });
+    } catch (error: any) {
+        console.error('Error updating role:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete role
+app.delete('/api/v1/permissions/roles/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        await getPermissionService().deleteRole(id);
+
+        // Log the action
+        await getAuditService().log(
+            'system',
+            'system',
+            'delete',
+            'roles',
+            id,
+            { severity: 'high' }
+        );
+
+        res.json({ success: true, message: 'Role deleted' });
+    } catch (error: any) {
+        console.error('Error deleting role:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Check permission
+app.post('/api/v1/permissions/check', async (req: Request, res: Response) => {
+    try {
+        const result = await getPermissionService().checkPermission(req.body);
+        res.json({ success: true, result });
+    } catch (error: any) {
+        console.error('Error checking permission:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get user permissions
+app.get('/api/v1/permissions/user/:userId', async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const permissions = await getPermissionService().getUserPermissions(userId);
+        res.json({ success: true, permissions });
+    } catch (error: any) {
+        console.error('Error getting user permissions:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Assign role to user
+app.put('/api/v1/permissions/user/:userId', async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params;
+        const { roleId, assignedBy } = req.body;
+
+        if (!roleId || !assignedBy) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        await getPermissionService().assignRole(userId, roleId, assignedBy);
+
+        // Log the action
+        await getAuditService().log(
+            assignedBy,
+            assignedBy,
+            'permission-change',
+            'users',
+            userId,
+            {
+                metadata: { roleId },
+                severity: 'high'
+            }
+        );
+
+        res.json({ success: true, message: 'Role assigned' });
+    } catch (error: any) {
+        console.error('Error assigning role:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get all permissions
+app.get('/api/v1/permissions', async (req: Request, res: Response) => {
+    try {
+        const permissions = await getPermissionService().getPermissions();
+        res.json({ success: true, permissions });
+    } catch (error: any) {
+        console.error('Error getting permissions:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== AUDIT ROUTES ====================
+
+// Query audit logs
+app.get('/api/v1/audit/logs', async (req: Request, res: Response) => {
+    try {
+        const query: any = {};
+
+        if (req.query.userId) query.userId = req.query.userId as string;
+        if (req.query.action) query.action = req.query.action as string;
+        if (req.query.resource) query.resource = req.query.resource as string;
+        if (req.query.severity) query.severity = req.query.severity as string;
+        if (req.query.startDate) query.startDate = new Date(req.query.startDate as string);
+        if (req.query.endDate) query.endDate = new Date(req.query.endDate as string);
+        if (req.query.limit) query.limit = parseInt(req.query.limit as string);
+        if (req.query.offset) query.offset = parseInt(req.query.offset as string);
+
+        const logs = await getAuditService().query(query);
+        res.json({ success: true, logs });
+    } catch (error: any) {
+        console.error('Error querying audit logs:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get specific audit log
+app.get('/api/v1/audit/logs/:id', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const log = await getAuditService().getLog(id);
+
+        if (!log) {
+            return res.status(404).json({ error: 'Audit log not found' });
+        }
+
+        res.json({ success: true, log });
+    } catch (error: any) {
+        console.error('Error getting audit log:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Export audit logs
+app.post('/api/v1/audit/export', async (req: Request, res: Response) => {
+    try {
+        const { query, format } = req.body;
+
+        if (!format || !['json', 'csv'].includes(format)) {
+            return res.status(400).json({ error: 'Invalid format. Use json or csv' });
+        }
+
+        const exportData = await getAuditService().exportLogs(query || {}, format);
+
+        // Log the export action
+        await getAuditService().log(
+            req.body.userId || 'system',
+            req.body.userName || 'system',
+            'export',
+            'audit-logs',
+            'export',
+            { severity: 'medium' }
+        );
+
+        res.setHeader('Content-Type', format === 'json' ? 'application/json' : 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=audit-logs.${format}`);
+        res.send(exportData);
+    } catch (error: any) {
+        console.error('Error exporting audit logs:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Generate compliance report
+app.post('/api/v1/audit/compliance', async (req: Request, res: Response) => {
+    try {
+        const { type, startDate, endDate, generatedBy } = req.body;
+
+        if (!type || !startDate || !endDate || !generatedBy) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        if (!['gdpr', 'data-access', 'retention', 'deletion'].includes(type)) {
+            return res.status(400).json({ error: 'Invalid report type' });
+        }
+
+        const report = await getAuditService().generateComplianceReport(
+            type,
+            new Date(startDate),
+            new Date(endDate),
+            generatedBy
+        );
+
+        res.json({ success: true, report });
+    } catch (error: any) {
+        console.error('Error generating compliance report:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==================== SYSTEM ROUTES ====================
+
+// Initialize default permissions and roles
+app.post('/api/v1/system/initialize', async (req: Request, res: Response) => {
+    try {
+        await getPermissionService().initializeDefaults();
+        res.json({ success: true, message: 'System initialized with default permissions and roles' });
+    } catch (error: any) {
+        console.error('Error initializing system:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Health check
+app.get('/health', (req: Request, res: Response) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Export the Express app as a Firebase Function
+export const api = functions.https.onRequest(app);
+
+// Export other functions
+export { startVideoGeneratorBuild } from './startVideoGeneratorBuild';
+
+// Start queue worker
+queueWorker.start();
+
+// Export auto-documentation webhook and scheduled functions
+export { onDeploymentWebhook, scheduledDocReview } from './autodoc';

@@ -7,6 +7,7 @@ import { Clock, FileText, CheckCircle, Settings as SettingsIcon, LogOut, User as
 import { useAuth } from '../contexts/AuthContext';
 import { jobService } from '../lib/firestore-service';
 import { validateFile, processFileUpload } from '../lib/upload-handler';
+import { HelpButton } from '../components/HelpButton';
 
 export const Dashboard = () => {
     const [showJobList, setShowJobList] = useState(false);
@@ -201,13 +202,20 @@ export const Dashboard = () => {
                     </div>
                 </div>
 
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold text-text">Upload PDF</h2>
+                    <HelpButton videoId="uploading-your-first-pdf" variant="button" size="sm" label="How to Upload" />
+                </div>
                 <FileUpload onUpload={handleUpload} />
 
                 {jobs.length > 0 && (
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-xl font-bold text-text">Recent Uploads</h2>
-                            <span className="text-sm text-muted">{jobs.length} jobs</span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-muted">{jobs.length} jobs</span>
+                                <HelpButton videoId="understanding-analysis-results" size="sm" />
+                            </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {jobs.slice(0, 6).map(job => (
