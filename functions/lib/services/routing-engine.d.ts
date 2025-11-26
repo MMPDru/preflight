@@ -52,5 +52,4 @@ export declare class RoutingEngine {
      */
     autoAssignApprovers(customerId: string, jobContext: Record<string, any>): Promise<string[]>;
 }
-export declare const routingEngine: RoutingEngine;
 //# sourceMappingURL=routing-engine.d.ts.map

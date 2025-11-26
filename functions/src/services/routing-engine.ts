@@ -274,4 +274,4 @@ export class RoutingEngine {
     }
 }
 
-export const routingEngine = new RoutingEngine(firestore());
+

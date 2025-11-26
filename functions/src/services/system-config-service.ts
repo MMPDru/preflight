@@ -270,4 +270,4 @@ export class SystemConfigService {
     }
 }
 
-export const systemConfigService = new SystemConfigService(firestore());
+

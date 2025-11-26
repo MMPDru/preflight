@@ -4,8 +4,7 @@
  * Manages approval chains, stages, and decisions
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.approvalService = exports.ApprovalService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.ApprovalService = void 0;
 class ApprovalService {
     constructor(db) {
         this.db = db;
@@ -307,5 +306,4 @@ class ApprovalService {
     }
 }
 exports.ApprovalService = ApprovalService;
-exports.approvalService = new ApprovalService((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=approval-service.js.map

@@ -82,5 +82,4 @@ export declare class NotificationService {
      */
     sendIssueDetectedNotification(userId: string, jobId: string, jobName: string, issueCount: number): Promise<void>;
 }
-export declare const notificationService: NotificationService;
 //# sourceMappingURL=notification-service.d.ts.map

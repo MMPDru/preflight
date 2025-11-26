@@ -4,8 +4,7 @@
  * Manages background job processing with priority scheduling and retry logic
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.jobQueueService = exports.JobQueueService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.JobQueueService = void 0;
 class JobQueueService {
     constructor(db) {
         this.processing = new Map();
@@ -273,5 +272,4 @@ class JobQueueService {
     }
 }
 exports.JobQueueService = JobQueueService;
-exports.jobQueueService = new JobQueueService((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=job-queue-service.js.map

@@ -80,5 +80,4 @@ export declare class SystemConfigService {
      */
     updateGeneralSettings(settings: Record<string, any>, updatedBy: string): Promise<void>;
 }
-export declare const systemConfigService: SystemConfigService;
 //# sourceMappingURL=system-config-service.d.ts.map

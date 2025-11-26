@@ -37,8 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.routingEngine = exports.RoutingEngine = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.RoutingEngine = void 0;
 const crypto = __importStar(require("crypto"));
 class RoutingEngine {
     constructor(db) {
@@ -240,5 +239,4 @@ class RoutingEngine {
     }
 }
 exports.RoutingEngine = RoutingEngine;
-exports.routingEngine = new RoutingEngine((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=routing-engine.js.map

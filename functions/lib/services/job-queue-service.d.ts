@@ -76,5 +76,4 @@ export declare class JobQueueService {
      */
     private logEvent;
 }
-export declare const jobQueueService: JobQueueService;
 //# sourceMappingURL=job-queue-service.d.ts.map

@@ -56,5 +56,4 @@ export declare class ApprovalService {
      */
     evaluateConditions(conditions: RoutingCondition[], context: Record<string, any>): Promise<boolean>;
 }
-export declare const approvalService: ApprovalService;
 //# sourceMappingURL=approval-service.d.ts.map

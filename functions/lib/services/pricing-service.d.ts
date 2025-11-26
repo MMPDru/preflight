@@ -73,5 +73,4 @@ export declare class PricingService {
      */
     initializeDefaultRules(): Promise<void>;
 }
-export declare const pricingService: PricingService;
 //# sourceMappingURL=pricing-service.d.ts.map

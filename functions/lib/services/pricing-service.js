@@ -4,8 +4,7 @@
  * Manages pricing rules, quote generation, and price calculation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.pricingService = exports.PricingService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.PricingService = void 0;
 class PricingService {
     constructor(db) {
         this.db = db;
@@ -288,5 +287,4 @@ class PricingService {
     }
 }
 exports.PricingService = PricingService;
-exports.pricingService = new PricingService((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=pricing-service.js.map

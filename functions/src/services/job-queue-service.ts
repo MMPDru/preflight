@@ -345,4 +345,4 @@ export class JobQueueService {
     }
 }
 
-export const jobQueueService = new JobQueueService(firestore());
+

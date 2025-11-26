@@ -66,5 +66,4 @@ export declare class AuditService {
      */
     exportLogs(query: AuditQuery, format: 'json' | 'csv'): Promise<string>;
 }
-export declare const auditService: AuditService;
 //# sourceMappingURL=audit-service.d.ts.map

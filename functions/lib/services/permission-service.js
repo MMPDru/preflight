@@ -4,8 +4,7 @@
  * Manages roles, permissions, and access control
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.permissionService = exports.PermissionService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.PermissionService = void 0;
 class PermissionService {
     constructor(db) {
         this.db = db;
@@ -263,5 +262,4 @@ class PermissionService {
     }
 }
 exports.PermissionService = PermissionService;
-exports.permissionService = new PermissionService((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=permission-service.js.map

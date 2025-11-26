@@ -4,8 +4,7 @@
  * Manages system settings, branding, feature toggles, and API configuration
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.systemConfigService = exports.SystemConfigService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.SystemConfigService = void 0;
 class SystemConfigService {
     constructor(db) {
         this.db = db;
@@ -227,5 +226,4 @@ class SystemConfigService {
     }
 }
 exports.SystemConfigService = SystemConfigService;
-exports.systemConfigService = new SystemConfigService((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=system-config-service.js.map

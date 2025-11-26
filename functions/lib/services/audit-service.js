@@ -4,8 +4,7 @@
  * Manages audit logging and compliance reporting
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.auditService = exports.AuditService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.AuditService = void 0;
 class AuditService {
     constructor(db) {
         this.db = db;
@@ -225,5 +224,4 @@ class AuditService {
     }
 }
 exports.AuditService = AuditService;
-exports.auditService = new AuditService((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=audit-service.js.map

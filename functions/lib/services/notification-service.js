@@ -4,8 +4,7 @@
  * Manages in-app and email notifications with preferences and templates
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.notificationService = exports.NotificationService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.NotificationService = void 0;
 const email_notification_service_1 = require("./email-notification-service");
 class NotificationService {
     constructor(db) {
@@ -267,5 +266,4 @@ class NotificationService {
     }
 }
 exports.NotificationService = NotificationService;
-exports.notificationService = new NotificationService((0, firebase_admin_1.firestore)());
 //# sourceMappingURL=notification-service.js.map

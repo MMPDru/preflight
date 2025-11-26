@@ -60,5 +60,4 @@ export declare class PermissionService {
      */
     getPermissions(): Promise<Permission[]>;
 }
-export declare const permissionService: PermissionService;
 //# sourceMappingURL=permission-service.d.ts.map
