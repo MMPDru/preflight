@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Environment variables - NEVER COMMIT THESE
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -23,3 +30,9 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
