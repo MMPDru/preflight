@@ -11,6 +11,10 @@ import { AuditService } from './audit-service';
 import { SystemConfigService } from './system-config-service';
 import { PricingService } from './pricing-service';
 import { BackupService } from './backup-service';
+import { PdfAnalyzerService } from './pdf-analyzer';
+import { PdfFixerService } from './pdf-fixer';
+import { EmailNotificationService } from './email-notification-service';
+import { GhostscriptService } from './ghostscript-service';
 export declare function getApprovalService(): ApprovalService;
 export declare function getJobQueueService(): JobQueueService;
 export declare function getNotificationService(): NotificationService;
@@ -20,6 +24,10 @@ export declare function getAuditService(): AuditService;
 export declare function getSystemConfigService(): SystemConfigService;
 export declare function getPricingService(): PricingService;
 export declare function getBackupService(): BackupService;
+export declare function getPdfAnalyzer(): PdfAnalyzerService;
+export declare function getPdfFixer(): PdfFixerService;
+export declare function getEmailService(): EmailNotificationService;
+export declare function getGhostscriptService(): GhostscriptService;
 export declare const approvalService: {
     get: typeof getApprovalService;
 };
@@ -46,5 +54,17 @@ export declare const pricingService: {
 };
 export declare const backupService: {
     get: typeof getBackupService;
+};
+export declare const pdfAnalyzer: {
+    get: typeof getPdfAnalyzer;
+};
+export declare const pdfFixer: {
+    get: typeof getPdfFixer;
+};
+export declare const emailService: {
+    get: typeof getEmailService;
+};
+export declare const ghostscript: {
+    get: typeof getGhostscriptService;
 };
 //# sourceMappingURL=service-instances.d.ts.map

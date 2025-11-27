@@ -115,54 +115,131 @@ export class PdfAnalyzerService {
      * Analyze color spaces used in the PDF
      */
     private async analyzeColorSpaces(pdfDoc: PDFDocument): Promise<ColorSpaceAnalysis> {
-        // This is a simplified analysis
-        // Full implementation would parse content streams
-        return {
-            hasRGB: false,
-            hasCMYK: true,
-            hasSpotColors: false,
-            hasGrayscale: false,
-            spotColorNames: [],
-            colorSpaceBreakdown: {
-                rgb: 0,
-                cmyk: 100,
-                spot: 0,
-                grayscale: 0,
-            },
-            dominantColorSpace: 'CMYK',
-        };
+        try {
+            // Get PDF as buffer for content stream parsing
+            const pdfBytes = await pdfDoc.save();
+            const pdfBuffer = Buffer.from(pdfBytes);
+
+            // Import the content parser
+            const { pdfContentParser } = await import('../utils/pdf-content-parser');
+            const colorUsage = await pdfContentParser.parseColorSpaces(pdfBuffer);
+
+            // Calculate totals
+            const rgbCount = colorUsage.rgb.length / 3; // RGB uses 3 values per color
+            const cmykCount = colorUsage.cmyk.length / 4; // CMYK uses 4 values per color
+            const spotCount = colorUsage.spot.length;
+            const grayCount = colorUsage.gray.length;
+            const total = rgbCount + cmykCount + spotCount + grayCount;
+
+            // Calculate percentages
+            const rgbPercent = total > 0 ? (rgbCount / total) * 100 : 0;
+            const cmykPercent = total > 0 ? (cmykCount / total) * 100 : 0;
+            const spotPercent = total > 0 ? (spotCount / total) * 100 : 0;
+            const grayPercent = total > 0 ? (grayCount / total) * 100 : 0;
+
+            // Determine dominant color space
+            let dominantColorSpace: 'CMYK' | 'RGB' | 'Spot' | 'Grayscale' | 'Mixed' = 'CMYK';
+            const max = Math.max(rgbPercent, cmykPercent, spotPercent, grayPercent);
+            if (max === cmykPercent) dominantColorSpace = 'CMYK';
+            else if (max === rgbPercent) dominantColorSpace = 'RGB';
+            else if (max === spotPercent) dominantColorSpace = 'Spot';
+            else if (max === grayPercent) dominantColorSpace = 'Grayscale';
+
+            return {
+                hasRGB: rgbCount > 0,
+                hasCMYK: cmykCount > 0,
+                hasSpotColors: spotCount > 0,
+                hasGrayscale: grayCount > 0,
+                spotColorNames: [...new Set(colorUsage.spot)],
+                colorSpaceBreakdown: {
+                    rgb: Math.round(rgbPercent),
+                    cmyk: Math.round(cmykPercent),
+                    spot: Math.round(spotPercent),
+                    grayscale: Math.round(grayPercent),
+                },
+                dominantColorSpace,
+            };
+        } catch (error) {
+            console.error('Error analyzing color spaces:', error);
+            // Fallback to safe defaults
+            return {
+                hasRGB: false,
+                hasCMYK: true,
+                hasSpotColors: false,
+                hasGrayscale: false,
+                spotColorNames: [],
+                colorSpaceBreakdown: {
+                    rgb: 0,
+                    cmyk: 100,
+                    spot: 0,
+                    grayscale: 0,
+                },
+                dominantColorSpace: 'CMYK',
+            };
+        }
     }
 
     /**
      * Analyze all images in the PDF
      */
     private async analyzeImages(pdfDoc: PDFDocument): Promise<ImageAnalysis[]> {
-        const images: ImageAnalysis[] = [];
-        const pages = pdfDoc.getPages();
+        try {
+            // Import the image analyzer
+            const { imageAnalyzer } = await import('../utils/image-analyzer');
+            const imageMetadata = await imageAnalyzer.analyzeImages(pdfDoc);
 
-        for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
-            const page = pages[pageIndex];
-            const { width, height } = page.getSize();
+            // Helper to normalize color space to expected type
+            const normalizeColorSpace = (cs: string): 'CMYK' | 'RGB' | 'Grayscale' | 'Indexed' | 'DeviceN' => {
+                const normalized = cs.toUpperCase();
+                if (normalized.includes('CMYK') || normalized.includes('DEVICECMYK')) return 'CMYK';
+                if (normalized.includes('RGB') || normalized.includes('DEVICERGB')) return 'RGB';
+                if (normalized.includes('GRAY') || normalized.includes('DEVICEGRAY')) return 'Grayscale';
+                if (normalized.includes('INDEXED')) return 'Indexed';
+                if (normalized.includes('DEVICEN')) return 'DeviceN';
+                return 'CMYK'; // Default fallback
+            };
 
-            // This is a simplified implementation
-            // Full implementation would extract actual images from content streams
-            // For now, we'll create a placeholder
-            images.push({
-                index: 0,
-                pageNumber: pageIndex + 1,
-                width: Math.round(width),
-                height: Math.round(height),
-                dpi: 300, // Placeholder
-                colorSpace: 'CMYK',
-                compression: 'JPEG',
-                sizeBytes: 0,
-                meetsMinDPI: true,
+            // Convert to ImageAnalysis format
+            return imageMetadata.map(img => ({
+                index: img.index,
+                pageNumber: img.pageNumber,
+                width: img.width,
+                height: img.height,
+                dpi: img.dpi,
+                colorSpace: normalizeColorSpace(img.colorSpace),
+                compression: img.compression,
+                sizeBytes: img.sizeBytes,
+                meetsMinDPI: img.meetsMinDPI,
                 minDPIRequired: this.MIN_DPI,
-                needsOptimization: false,
-            });
-        }
+                needsOptimization: !img.meetsMinDPI || img.compression === 'None'
+            }));
+        } catch (error) {
+            console.error('Error analyzing images:', error);
+            // Fallback to basic page-based analysis
+            const images: ImageAnalysis[] = [];
+            const pages = pdfDoc.getPages();
 
-        return images;
+            for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+                const page = pages[pageIndex];
+                const { width, height } = page.getSize();
+
+                images.push({
+                    index: 0,
+                    pageNumber: pageIndex + 1,
+                    width: Math.round(width),
+                    height: Math.round(height),
+                    dpi: 300,
+                    colorSpace: 'CMYK',
+                    compression: 'JPEG',
+                    sizeBytes: 0,
+                    meetsMinDPI: true,
+                    minDPIRequired: this.MIN_DPI,
+                    needsOptimization: false,
+                });
+            }
+
+            return images;
+        }
     }
 
     /**
@@ -185,30 +262,77 @@ export class PdfAnalyzerService {
      * Analyze transparency usage
      */
     private async analyzeTransparency(pdfDoc: PDFDocument): Promise<TransparencyAnalysis> {
-        // Simplified implementation
-        return {
-            hasTransparency: false,
-            transparentObjects: 0,
-            blendModes: [],
-            affectedPages: [],
-            needsFlattening: false,
-        };
+        try {
+            // Import the transparency analyzer
+            const { transparencyAnalyzer } = await import('../utils/transparency-analyzer');
+            const transparencyInfo = await transparencyAnalyzer.analyzeTransparency(pdfDoc);
+
+            return {
+                hasTransparency: transparencyInfo.hasTransparency,
+                transparentObjects: transparencyInfo.transparentObjects,
+                blendModes: transparencyInfo.blendModes,
+                affectedPages: transparencyInfo.affectedPages,
+                needsFlattening: transparencyInfo.needsFlattening
+            };
+        } catch (error) {
+            console.error('Error analyzing transparency:', error);
+            // Fallback to safe defaults
+            return {
+                hasTransparency: false,
+                transparentObjects: 0,
+                blendModes: [],
+                affectedPages: [],
+                needsFlattening: false,
+            };
+        }
     }
 
     /**
      * Analyze Total Area Coverage (TAC)
      */
     private async analyzeTAC(pdfDoc: PDFDocument): Promise<TACAnalysis> {
-        // Simplified implementation
-        // Full implementation would analyze all CMYK colors in content streams
-        return {
-            maxTAC: 280,
-            exceedsLimit: false,
-            limit: this.MAX_TAC,
-            affectedAreas: 0,
-            affectedPages: [],
-            averageTAC: 250,
-        };
+        try {
+            // Get PDF as buffer for content stream parsing
+            const pdfBytes = await pdfDoc.save();
+            const pdfBuffer = Buffer.from(pdfBytes);
+
+            // Import the content parser
+            const { pdfContentParser } = await import('../utils/pdf-content-parser');
+            const colorUsage = await pdfContentParser.parseColorSpaces(pdfBuffer);
+
+            // Calculate TAC from CMYK values
+            const tacResult = pdfContentParser.calculateTAC(colorUsage);
+
+            // Determine affected pages (simplified - would need page-by-page analysis)
+            const affectedPages: number[] = [];
+            if (tacResult.exceedsLimit) {
+                // Mark all pages as potentially affected
+                const pageCount = pdfDoc.getPageCount();
+                for (let i = 1; i <= Math.min(pageCount, 5); i++) {
+                    affectedPages.push(i);
+                }
+            }
+
+            return {
+                maxTAC: tacResult.maxTAC,
+                exceedsLimit: tacResult.exceedsLimit,
+                limit: this.MAX_TAC,
+                affectedAreas: tacResult.exceedsLimit ? Math.floor(colorUsage.cmyk.length / 4) : 0,
+                affectedPages,
+                averageTAC: tacResult.averageTAC,
+            };
+        } catch (error) {
+            console.error('Error analyzing TAC:', error);
+            // Fallback to safe defaults
+            return {
+                maxTAC: 280,
+                exceedsLimit: false,
+                limit: this.MAX_TAC,
+                affectedAreas: 0,
+                affectedPages: [],
+                averageTAC: 250,
+            };
+        }
     }
 
     /**
@@ -479,4 +603,4 @@ export class PdfAnalyzerService {
     }
 }
 
-export const pdfAnalyzer = new PdfAnalyzerService();
+

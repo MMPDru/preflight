@@ -43,7 +43,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ghostscript = exports.GhostscriptService = void 0;
+exports.GhostscriptService = void 0;
 const child_process_1 = require("child_process");
 const util_1 = require("util");
 const fs = __importStar(require("fs"));
@@ -285,5 +285,4 @@ class GhostscriptService {
     }
 }
 exports.GhostscriptService = GhostscriptService;
-exports.ghostscript = new GhostscriptService();
 //# sourceMappingURL=ghostscript-service.js.map

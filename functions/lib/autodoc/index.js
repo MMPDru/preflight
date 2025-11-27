@@ -33,15 +33,21 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scheduledDocReview = exports.onDeploymentWebhook = exports.autoDocSystem = exports.AutoDocumentationSystem = void 0;
+exports.scheduledDocReview = exports.onDeploymentWebhook = exports.AutoDocumentationSystem = void 0;
+exports.getAutoDocSystem = getAutoDocSystem;
 const functions = __importStar(require("firebase-functions"));
 const changeDetector_1 = require("./changeDetector");
 const documentationGenerator_1 = require("./documentationGenerator");
 const trainingContentManager_1 = require("./trainingContentManager");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
-const db = admin.firestore();
 class AutoDocumentationSystem {
+    /**
+     * Get Firestore instance lazily
+     */
+    get db() {
+        return admin.firestore();
+    }
     /**
      * Main handler triggered on deployment
      */
@@ -83,7 +89,7 @@ class AutoDocumentationSystem {
      * Update deployment status
      */
     async updateDeploymentStatus(deploymentId, status) {
-        await db.collection('deployments').doc(deploymentId).update({
+        await this.db.collection('deployments').doc(deploymentId).update({
             status,
             updatedAt: firestore_1.Timestamp.now(),
         });
@@ -92,7 +98,7 @@ class AutoDocumentationSystem {
      * Save generated documentation
      */
     async saveDocumentation(deploymentId, doc) {
-        await db.collection('documentation').doc(deploymentId).set({
+        await this.db.collection('documentation').doc(deploymentId).set({
             deploymentId,
             ...doc,
             createdAt: firestore_1.Timestamp.now(),
@@ -126,7 +132,7 @@ class AutoDocumentationSystem {
             recipients: ['all-users'],
             createdAt: firestore_1.Timestamp.now(),
         };
-        await db.collection('email-queue').add(summary);
+        await this.db.collection('email-queue').add(summary);
     }
     /**
      * Create in-app notifications
@@ -140,7 +146,7 @@ class AutoDocumentationSystem {
             createdAt: firestore_1.Timestamp.now(),
             read: false,
         };
-        await db.collection('notifications').add(notification);
+        await this.db.collection('notifications').add(notification);
     }
     /**
      * Notify support team
@@ -157,7 +163,7 @@ class AutoDocumentationSystem {
             recommendedActions: this.generateSupportActions(changes),
             createdAt: firestore_1.Timestamp.now(),
         };
-        await db.collection('support-briefings').add(briefing);
+        await this.db.collection('support-briefings').add(briefing);
     }
     /**
      * Notify customer success team
@@ -165,7 +171,7 @@ class AutoDocumentationSystem {
     async notifyCustomerSuccess(deployment, changes) {
         const highImpactChanges = changes.filter(c => c.impactLevel === 'high');
         if (highImpactChanges.length > 0) {
-            await db.collection('customer-success-alerts').add({
+            await this.db.collection('customer-success-alerts').add({
                 deploymentId: deployment.id,
                 alertType: 'high-impact-changes',
                 changes: highImpactChanges,
@@ -206,7 +212,14 @@ class AutoDocumentationSystem {
     }
 }
 exports.AutoDocumentationSystem = AutoDocumentationSystem;
-exports.autoDocSystem = new AutoDocumentationSystem();
+// Lazy singleton
+let _autoDocSystem = null;
+function getAutoDocSystem() {
+    if (!_autoDocSystem) {
+        _autoDocSystem = new AutoDocumentationSystem();
+    }
+    return _autoDocSystem;
+}
 /**
  * Firebase Cloud Function: Deployment Webhook
  * Triggered when a new deployment is detected
@@ -228,9 +241,9 @@ exports.onDeploymentWebhook = functions.https.onRequest(async (req, res) => {
             status: 'pending',
         };
         // Save deployment record
-        await db.collection('deployments').doc(deployment.id).set(deployment);
+        await admin.firestore().collection('deployments').doc(deployment.id).set(deployment);
         // Process asynchronously
-        exports.autoDocSystem.onDeployment(deployment).catch(error => {
+        getAutoDocSystem().onDeployment(deployment).catch(error => {
             console.error('Error in auto-documentation:', error);
         });
         res.status(200).json({

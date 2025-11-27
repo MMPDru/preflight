@@ -3,7 +3,7 @@ import * as admin from 'firebase-admin';
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { pdfFixer } from './services/pdf-fixer';
+
 import {
     getApprovalService,
     getJobQueueService,
@@ -11,6 +11,8 @@ import {
     getRoutingEngine,
     getPermissionService,
     getAuditService,
+    getPdfFixer,
+    getPdfAnalyzer,
 } from './services/service-instances';
 import { queueWorker } from './workers/queue-worker';
 import busboy from 'busboy';
@@ -70,9 +72,8 @@ app.post('/api/v1/analyze-pdf', async (req: Request, res: Response) => {
 
             const fileBuffer = fs.readFileSync(filePath);
 
-            // Import analyzer dynamically
-            const { pdfAnalyzer } = await import('./services/pdf-analyzer');
-            const analysis = await pdfAnalyzer.analyzeDocument(fileBuffer);
+            // Use lazy-loaded analyzer
+            const analysis = await getPdfAnalyzer().analyzeDocument(fileBuffer);
 
             // Cleanup
             fs.unlinkSync(filePath);
@@ -150,7 +151,7 @@ app.post('/api/v1/fix-pdf', async (req: Request, res: Response) => {
             const fileBuffer = fs.readFileSync(filePath);
 
             // Process PDF with fixes and get analysis
-            const result = await pdfFixer.processPdfWithAnalysis(fileBuffer, fixTypes, options);
+            const result = await getPdfFixer().processPdfWithAnalysis(fileBuffer, fixTypes, options);
 
             // Upload fixed PDF to Firebase Storage
             const bucket = admin.storage().bucket();

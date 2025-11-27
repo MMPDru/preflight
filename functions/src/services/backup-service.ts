@@ -385,8 +385,3 @@ export class BackupService {
         return deletedCount;
     }
 }
-
-export const backupService = new BackupService(
-    firestore(),
-    storage().bucket()
-);

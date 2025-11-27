@@ -48,5 +48,4 @@ export declare class GhostscriptService {
      */
     processBuffer(inputBuffer: Buffer, operation: 'cmyk' | 'flatten' | 'resample' | 'optimize' | 'pdfx', options?: any): Promise<Buffer>;
 }
-export declare const ghostscript: GhostscriptService;
 //# sourceMappingURL=ghostscript-service.d.ts.map

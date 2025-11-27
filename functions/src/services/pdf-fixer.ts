@@ -2,11 +2,11 @@ import { PDFDocument, PDFName, PDFDict, PDFArray } from 'pdf-lib';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { pdfAnalyzer } from './pdf-analyzer';
+import { PdfAnalyzerService } from './pdf-analyzer';
 import { colorConverter } from '../utils/color-converter';
 import { imageOptimizer } from '../utils/image-optimizer';
 import { fontProcessor } from '../utils/font-processor';
-import { ghostscript } from './ghostscript-service';
+import { GhostscriptService } from './ghostscript-service';
 import type { PreFlightReport, FixOptions } from '../types/preflight-types';
 
 // NOTE: In a full production environment (Google Cloud Run), we would use Ghostscript
@@ -15,13 +15,17 @@ import type { PreFlightReport, FixOptions } from '../types/preflight-types';
 // to perform structural fixes and metadata compliance.
 
 export class PdfFixerService {
+    constructor(
+        private pdfAnalyzer: PdfAnalyzerService,
+        private ghostscript: GhostscriptService
+    ) { }
 
     /**
      * Process PDF with fixes and return analysis report
      */
     async processPdfWithAnalysis(fileBuffer: Buffer, operations: string[], options?: FixOptions): Promise<{ buffer: Buffer; analysis: PreFlightReport }> {
         const buffer = await this.processPdf(fileBuffer, operations, options);
-        const analysis = await pdfAnalyzer.analyzeDocument(buffer);
+        const analysis = await this.pdfAnalyzer.analyzeDocument(buffer);
         return { buffer, analysis };
     }
 
@@ -195,7 +199,7 @@ export class PdfFixerService {
 
     private async convertToCMYK(pdfDoc: PDFDocument) {
         // Check if Ghostscript is available for actual conversion
-        const gsAvailable = await ghostscript.isInstalled();
+        const gsAvailable = await this.ghostscript.isInstalled();
 
         if (gsAvailable) {
             console.log('Using Ghostscript for actual RGB to CMYK conversion');
@@ -238,7 +242,7 @@ export class PdfFixerService {
 
     private async resampleImages(pdfDoc: PDFDocument) {
         // Check if Ghostscript is available for actual resampling
-        const gsAvailable = await ghostscript.isInstalled();
+        const gsAvailable = await this.ghostscript.isInstalled();
 
         if (gsAvailable) {
             console.log('Ghostscript available for image resampling');
@@ -336,7 +340,7 @@ export class PdfFixerService {
      */
     private async flattenTransparency(pdfDoc: PDFDocument) {
         // Check if Ghostscript is available for actual flattening
-        const gsAvailable = await ghostscript.isInstalled();
+        const gsAvailable = await this.ghostscript.isInstalled();
 
         if (gsAvailable) {
             console.log('Ghostscript available for transparency flattening');
@@ -412,5 +416,3 @@ export class PdfFixerService {
         pdfDoc.setKeywords([...(pdfDoc.getKeywords()?.split(' ') || []), standard]);
     }
 }
-
-export const pdfFixer = new PdfFixerService();

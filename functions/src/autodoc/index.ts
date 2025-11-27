@@ -5,8 +5,6 @@ import { trainingManager } from './trainingContentManager';
 import * as admin from 'firebase-admin';
 import { Timestamp } from 'firebase-admin/firestore';
 
-const db = admin.firestore();
-
 export interface Deployment {
     id: string;
     timestamp: Timestamp;
@@ -19,6 +17,13 @@ export interface Deployment {
 }
 
 export class AutoDocumentationSystem {
+    /**
+     * Get Firestore instance lazily
+     */
+    private get db(): FirebaseFirestore.Firestore {
+        return admin.firestore();
+    }
+
     /**
      * Main handler triggered on deployment
      */
@@ -72,7 +77,7 @@ export class AutoDocumentationSystem {
         deploymentId: string,
         status: Deployment['status']
     ): Promise<void> {
-        await db.collection('deployments').doc(deploymentId).update({
+        await this.db.collection('deployments').doc(deploymentId).update({
             status,
             updatedAt: Timestamp.now(),
         });
@@ -82,7 +87,7 @@ export class AutoDocumentationSystem {
      * Save generated documentation
      */
     private async saveDocumentation(deploymentId: string, doc: any): Promise<void> {
-        await db.collection('documentation').doc(deploymentId).set({
+        await this.db.collection('documentation').doc(deploymentId).set({
             deploymentId,
             ...doc,
             createdAt: Timestamp.now(),
@@ -127,7 +132,7 @@ export class AutoDocumentationSystem {
             createdAt: Timestamp.now(),
         };
 
-        await db.collection('email-queue').add(summary);
+        await this.db.collection('email-queue').add(summary);
     }
 
     /**
@@ -143,7 +148,7 @@ export class AutoDocumentationSystem {
             read: false,
         };
 
-        await db.collection('notifications').add(notification);
+        await this.db.collection('notifications').add(notification);
     }
 
     /**
@@ -162,7 +167,7 @@ export class AutoDocumentationSystem {
             createdAt: Timestamp.now(),
         };
 
-        await db.collection('support-briefings').add(briefing);
+        await this.db.collection('support-briefings').add(briefing);
     }
 
     /**
@@ -172,7 +177,7 @@ export class AutoDocumentationSystem {
         const highImpactChanges = changes.filter(c => c.impactLevel === 'high');
 
         if (highImpactChanges.length > 0) {
-            await db.collection('customer-success-alerts').add({
+            await this.db.collection('customer-success-alerts').add({
                 deploymentId: deployment.id,
                 alertType: 'high-impact-changes',
                 changes: highImpactChanges,
@@ -220,7 +225,14 @@ export class AutoDocumentationSystem {
     }
 }
 
-export const autoDocSystem = new AutoDocumentationSystem();
+// Lazy singleton
+let _autoDocSystem: AutoDocumentationSystem | null = null;
+export function getAutoDocSystem(): AutoDocumentationSystem {
+    if (!_autoDocSystem) {
+        _autoDocSystem = new AutoDocumentationSystem();
+    }
+    return _autoDocSystem;
+}
 
 /**
  * Firebase Cloud Function: Deployment Webhook
@@ -245,10 +257,10 @@ export const onDeploymentWebhook = functions.https.onRequest(async (req, res) =>
         };
 
         // Save deployment record
-        await db.collection('deployments').doc(deployment.id).set(deployment);
+        await admin.firestore().collection('deployments').doc(deployment.id).set(deployment);
 
         // Process asynchronously
-        autoDocSystem.onDeployment(deployment).catch(error => {
+        getAutoDocSystem().onDeployment(deployment).catch(error => {
             console.error('Error in auto-documentation:', error);
         });
 

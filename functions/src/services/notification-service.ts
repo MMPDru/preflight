@@ -12,7 +12,7 @@ import type {
     NotificationPreferences,
     EmailTemplate,
 } from '../types/workflow-types';
-import { emailService } from './email-notification-service';
+import { getEmailService } from './service-instances';
 
 export class NotificationService {
     private db: firestore.Firestore;
@@ -133,7 +133,7 @@ export class NotificationService {
         });
 
         // Send email using existing email service
-        await emailService.sendProofReadyNotification({
+        await getEmailService().sendProofReadyNotification({
             customerName: user.displayName || 'User',
             customerEmail: email,
             jobName: notification.data?.jobName || notification.title,

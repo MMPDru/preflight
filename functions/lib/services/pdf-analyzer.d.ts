@@ -55,5 +55,4 @@ export declare class PdfAnalyzerService {
      */
     private generateRecommendations;
 }
-export declare const pdfAnalyzer: PdfAnalyzerService;
 //# sourceMappingURL=pdf-analyzer.d.ts.map

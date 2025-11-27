@@ -105,5 +105,4 @@ export declare class EmailNotificationService {
      */
     scheduleReminders(jobId: string, deadline: Date): Promise<void>;
 }
-export declare const emailService: EmailNotificationService;
 //# sourceMappingURL=email-notification-service.d.ts.map

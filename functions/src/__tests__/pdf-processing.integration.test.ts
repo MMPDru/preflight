@@ -2,8 +2,7 @@
  * Integration Tests for PDF Processing Pipeline
  */
 
-import { pdfFixer } from '../services/pdf-fixer';
-import { pdfAnalyzer } from '../services/pdf-analyzer';
+import { getPdfFixer, getPdfAnalyzer } from '../services/service-instances';
 import { PDFDocument, rgb } from 'pdf-lib';
 
 describe('PDF Processing Integration Tests', () => {
@@ -33,11 +32,11 @@ describe('PDF Processing Integration Tests', () => {
     describe('Complete Workflow', () => {
         it('should analyze, fix, and re-analyze PDF', async () => {
             // Step 1: Analyze original PDF
-            const originalAnalysis = await pdfAnalyzer.analyzeDocument(testPdfBuffer);
+            const originalAnalysis = await getPdfAnalyzer().analyzeDocument(testPdfBuffer);
             expect(originalAnalysis).toBeDefined();
 
             // Step 2: Apply fixes
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['normalize', 'boxes'],
                 {}
@@ -46,7 +45,7 @@ describe('PDF Processing Integration Tests', () => {
             expect(fixedBuffer.length).toBeGreaterThan(0);
 
             // Step 3: Re-analyze fixed PDF
-            const fixedAnalysis = await pdfAnalyzer.analyzeDocument(fixedBuffer);
+            const fixedAnalysis = await getPdfAnalyzer().analyzeDocument(fixedBuffer);
             expect(fixedAnalysis).toBeDefined();
             expect(fixedAnalysis.documentInfo.pageCount).toBe(
                 originalAnalysis.documentInfo.pageCount
@@ -54,7 +53,7 @@ describe('PDF Processing Integration Tests', () => {
         });
 
         it('should process PDF with analysis in one call', async () => {
-            const result = await pdfFixer.processPdfWithAnalysis(
+            const result = await getPdfFixer().processPdfWithAnalysis(
                 testPdfBuffer,
                 ['normalize'],
                 {}
@@ -68,7 +67,7 @@ describe('PDF Processing Integration Tests', () => {
 
     describe('Fix Operations', () => {
         it('should apply CMYK conversion', async () => {
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['cmyk'],
                 {}
@@ -83,7 +82,7 @@ describe('PDF Processing Integration Tests', () => {
         });
 
         it('should normalize metadata', async () => {
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['normalize'],
                 {}
@@ -95,7 +94,7 @@ describe('PDF Processing Integration Tests', () => {
         });
 
         it('should fix page boxes', async () => {
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['boxes'],
                 {}
@@ -110,7 +109,7 @@ describe('PDF Processing Integration Tests', () => {
         });
 
         it('should handle multiple operations', async () => {
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['cmyk', 'normalize', 'boxes'],
                 {}
@@ -128,7 +127,7 @@ describe('PDF Processing Integration Tests', () => {
             const invalidBuffer = Buffer.from('not a pdf');
 
             await expect(
-                pdfAnalyzer.analyzeDocument(invalidBuffer)
+                getPdfAnalyzer().analyzeDocument(invalidBuffer)
             ).rejects.toThrow();
         });
 
@@ -136,13 +135,13 @@ describe('PDF Processing Integration Tests', () => {
             const emptyBuffer = Buffer.alloc(0);
 
             await expect(
-                pdfAnalyzer.analyzeDocument(emptyBuffer)
+                getPdfAnalyzer().analyzeDocument(emptyBuffer)
             ).rejects.toThrow();
         });
 
         it('should handle unknown fix operation gracefully', async () => {
             // Unknown operations should be ignored
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['normalize', 'unknown-operation' as any],
                 {}
@@ -156,7 +155,7 @@ describe('PDF Processing Integration Tests', () => {
         it('should process small PDFs quickly', async () => {
             const startTime = Date.now();
 
-            await pdfFixer.processPdfWithAnalysis(
+            await getPdfFixer().processPdfWithAnalysis(
                 testPdfBuffer,
                 ['normalize'],
                 {}
@@ -174,7 +173,7 @@ describe('PDF Processing Integration Tests', () => {
             const originalDoc = await PDFDocument.load(testPdfBuffer);
             const originalPageCount = originalDoc.getPageCount();
 
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['normalize', 'boxes'],
                 {}
@@ -189,7 +188,7 @@ describe('PDF Processing Integration Tests', () => {
             const originalPage = originalDoc.getPage(0);
             const originalSize = originalPage.getSize();
 
-            const fixedBuffer = await pdfFixer.processPdf(
+            const fixedBuffer = await getPdfFixer().processPdf(
                 testPdfBuffer,
                 ['normalize'],
                 {}

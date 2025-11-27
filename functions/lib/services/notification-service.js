@@ -5,7 +5,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationService = void 0;
-const email_notification_service_1 = require("./email-notification-service");
+const service_instances_1 = require("./service-instances");
 class NotificationService {
     constructor(db) {
         this.db = db;
@@ -89,7 +89,7 @@ class NotificationService {
             userName: user.displayName || 'User',
         });
         // Send email using existing email service
-        await email_notification_service_1.emailService.sendProofReadyNotification({
+        await (0, service_instances_1.getEmailService)().sendProofReadyNotification({
             customerName: user.displayName || 'User',
             customerEmail: email,
             jobName: notification.data?.jobName || notification.title,

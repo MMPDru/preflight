@@ -4,8 +4,7 @@
  * Manages database backups, data export/import, and disaster recovery
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.backupService = exports.BackupService = void 0;
-const firebase_admin_1 = require("firebase-admin");
+exports.BackupService = void 0;
 class BackupService {
     constructor(db, bucket) {
         this.db = db;
@@ -300,5 +299,4 @@ class BackupService {
     }
 }
 exports.BackupService = BackupService;
-exports.backupService = new BackupService((0, firebase_admin_1.firestore)(), (0, firebase_admin_1.storage)().bucket());
 //# sourceMappingURL=backup-service.js.map

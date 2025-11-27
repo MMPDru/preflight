@@ -3,13 +3,16 @@
  * Background job processor for handling queued tasks
  */
 
-import { jobQueueService } from '../services/job-queue-service';
-import { pdfAnalyzer } from '../services/pdf-analyzer';
-import { pdfFixer } from '../services/pdf-fixer';
-import { notificationService } from '../services/notification-service';
-import { emailService } from '../services/email-notification-service';
-import type { QueueJob } from '../types/workflow-types';
+import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
+import {
+    getJobQueueService,
+    getNotificationService,
+    getPdfAnalyzer,
+    getPdfFixer,
+    getEmailService
+} from '../services/service-instances';
+import type { QueueJob } from '../types/workflow-types';
 
 export class QueueWorker {
     private isRunning = false;
@@ -49,7 +52,7 @@ export class QueueWorker {
             try {
                 // Check if we can process more jobs
                 if (this.currentJobs < this.maxConcurrent) {
-                    const job = await jobQueueService.getNextJob();
+                    const job = await getJobQueueService().getNextJob();
 
                     if (job) {
                         // Process job in background
@@ -77,7 +80,7 @@ export class QueueWorker {
         try {
             console.log(`📋 Processing job ${job.id} (${job.type})`);
 
-            await jobQueueService.startJob(job.id);
+            await getJobQueueService().startJob(job.id);
 
             // Route to appropriate handler
             switch (job.type) {
@@ -109,11 +112,11 @@ export class QueueWorker {
                     throw new Error(`Unknown job type: ${job.type}`);
             }
 
-            await jobQueueService.completeJob(job.id);
+            await getJobQueueService().completeJob(job.id);
             console.log(`✅ Job ${job.id} completed`);
         } catch (error: any) {
             console.error(`❌ Job ${job.id} failed:`, error.message);
-            await jobQueueService.failJob(job.id, error, true);
+            await getJobQueueService().failJob(job.id, error, true);
         } finally {
             this.currentJobs--;
         }
@@ -125,11 +128,11 @@ export class QueueWorker {
     private async handlePdfAnalysis(job: QueueJob): Promise<void> {
         const { fileBuffer, jobId } = job.payload;
 
-        await jobQueueService.updateProgress(job.id, 10, 'Loading PDF');
+        await getJobQueueService().updateProgress(job.id, 10, 'Loading PDF');
 
-        const analysis = await pdfAnalyzer.analyzeDocument(fileBuffer);
+        const analysis = await getPdfAnalyzer().analyzeDocument(fileBuffer);
 
-        await jobQueueService.updateProgress(job.id, 90, 'Saving results');
+        await getJobQueueService().updateProgress(job.id, 90, 'Saving results');
 
         // Save analysis to Firestore
         await admin.firestore().collection('jobs').doc(jobId).update({
@@ -137,7 +140,7 @@ export class QueueWorker {
             analyzedAt: new Date(),
         });
 
-        await jobQueueService.updateProgress(job.id, 100, 'Complete');
+        await getJobQueueService().updateProgress(job.id, 100, 'Complete');
     }
 
     /**
@@ -146,15 +149,15 @@ export class QueueWorker {
     private async handlePdfFix(job: QueueJob): Promise<void> {
         const { fileBuffer, fixTypes, options, jobId } = job.payload;
 
-        await jobQueueService.updateProgress(job.id, 10, 'Loading PDF');
+        await getJobQueueService().updateProgress(job.id, 10, 'Loading PDF');
 
-        const fixedBuffer = await pdfFixer.processPdf(fileBuffer, fixTypes, options);
+        const fixedBuffer = await getPdfFixer().processPdf(fileBuffer, fixTypes, options);
 
-        await jobQueueService.updateProgress(job.id, 70, 'Analyzing fixed PDF');
+        await getJobQueueService().updateProgress(job.id, 70, 'Analyzing fixed PDF');
 
-        const analysis = await pdfAnalyzer.analyzeDocument(fixedBuffer);
+        const analysis = await getPdfAnalyzer().analyzeDocument(fixedBuffer);
 
-        await jobQueueService.updateProgress(job.id, 90, 'Uploading fixed PDF');
+        await getJobQueueService().updateProgress(job.id, 90, 'Uploading fixed PDF');
 
         // Upload to Firebase Storage
         const bucket = admin.storage().bucket();
@@ -179,7 +182,7 @@ export class QueueWorker {
             fixedAt: new Date(),
         });
 
-        await jobQueueService.updateProgress(job.id, 100, 'Complete');
+        await getJobQueueService().updateProgress(job.id, 100, 'Complete');
     }
 
     /**
@@ -188,29 +191,29 @@ export class QueueWorker {
     private async handleEmail(job: QueueJob): Promise<void> {
         const { type, data } = job.payload;
 
-        await jobQueueService.updateProgress(job.id, 50, 'Sending email');
+        await getJobQueueService().updateProgress(job.id, 50, 'Sending email');
 
         switch (type) {
             case 'proof-ready':
-                await emailService.sendProofReadyNotification(data);
+                await getEmailService().sendProofReadyNotification(data);
                 break;
             case 'reminder':
-                await emailService.sendReminderNotification(data);
+                await getEmailService().sendReminderNotification(data);
                 break;
             case 'issue-alert':
-                await emailService.sendIssueAlert(data);
+                await getEmailService().sendIssueAlert(data);
                 break;
             case 'revision':
-                await emailService.sendRevisionNotification(data);
+                await getEmailService().sendRevisionNotification(data);
                 break;
             case 'approval':
-                await emailService.sendApprovalConfirmation(data);
+                await getEmailService().sendApprovalConfirmation(data);
                 break;
             default:
                 throw new Error(`Unknown email type: ${type}`);
         }
 
-        await jobQueueService.updateProgress(job.id, 100, 'Email sent');
+        await getJobQueueService().updateProgress(job.id, 100, 'Email sent');
     }
 
     /**
@@ -219,11 +222,11 @@ export class QueueWorker {
     private async handleNotification(job: QueueJob): Promise<void> {
         const { userId, type, title, message, options } = job.payload;
 
-        await jobQueueService.updateProgress(job.id, 50, 'Sending notification');
+        await getJobQueueService().updateProgress(job.id, 50, 'Sending notification');
 
-        await notificationService.sendNotification(userId, type, title, message, options);
+        await getNotificationService().sendNotification(userId, type, title, message, options);
 
-        await jobQueueService.updateProgress(job.id, 100, 'Notification sent');
+        await getJobQueueService().updateProgress(job.id, 100, 'Notification sent');
     }
 
     /**
@@ -231,9 +234,10 @@ export class QueueWorker {
      */
     private async handleFileProcessing(job: QueueJob): Promise<void> {
         // Placeholder for file processing
-        await jobQueueService.updateProgress(job.id, 50, 'Processing file');
+        await getJobQueueService().startJob(job.id);
+        await getJobQueueService().updateProgress(job.id, 50, 'Processing file');
         await this.sleep(1000);
-        await jobQueueService.updateProgress(job.id, 100, 'File processed');
+        await getJobQueueService().completeJob(job.id, { message: 'File processed' });
     }
 
     /**
@@ -241,9 +245,9 @@ export class QueueWorker {
      */
     private async handleReportGeneration(job: QueueJob): Promise<void> {
         // Placeholder for report generation
-        await jobQueueService.updateProgress(job.id, 50, 'Generating report');
+        await getJobQueueService().updateProgress(job.id, 50, 'Generating report');
         await this.sleep(1000);
-        await jobQueueService.updateProgress(job.id, 100, 'Report generated');
+        await getJobQueueService().updateProgress(job.id, 100, 'Report generated');
     }
 
     /**
@@ -251,22 +255,22 @@ export class QueueWorker {
      */
     private async handleBackup(job: QueueJob): Promise<void> {
         // Placeholder for backup
-        await jobQueueService.updateProgress(job.id, 50, 'Creating backup');
+        await getJobQueueService().updateProgress(job.id, 50, 'Creating backup');
         await this.sleep(1000);
-        await jobQueueService.updateProgress(job.id, 100, 'Backup complete');
+        await getJobQueueService().updateProgress(job.id, 100, 'Backup complete');
     }
 
     /**
      * Handle cleanup job
      */
     private async handleCleanup(job: QueueJob): Promise<void> {
-        await jobQueueService.updateProgress(job.id, 25, 'Cleaning old jobs');
-        await jobQueueService.cleanupOldJobs(30);
+        await getJobQueueService().updateProgress(job.id, 25, 'Cleaning old jobs');
+        await getJobQueueService().cleanupOldJobs(30);
 
-        await jobQueueService.updateProgress(job.id, 50, 'Cleaning old notifications');
-        await notificationService.cleanupOldNotifications(90);
+        await getJobQueueService().updateProgress(job.id, 50, 'Cleaning old notifications');
+        await getNotificationService().cleanupOldNotifications(90);
 
-        await jobQueueService.updateProgress(job.id, 100, 'Cleanup complete');
+        await getJobQueueService().updateProgress(job.id, 100, 'Cleanup complete');
     }
 
     /**
@@ -280,7 +284,5 @@ export class QueueWorker {
 // Export singleton
 export const queueWorker = new QueueWorker();
 
-// Auto-start worker in production
-if (process.env.NODE_ENV === 'production') {
-    queueWorker.start();
-}
+// Note: Worker must be manually started via queueWorker.start()
+// or through a Cloud Function trigger

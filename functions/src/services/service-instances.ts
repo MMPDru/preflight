@@ -13,6 +13,10 @@ import { AuditService } from './audit-service';
 import { SystemConfigService } from './system-config-service';
 import { PricingService } from './pricing-service';
 import { BackupService } from './backup-service';
+import { PdfAnalyzerService } from './pdf-analyzer';
+import { PdfFixerService } from './pdf-fixer';
+import { EmailNotificationService } from './email-notification-service';
+import { GhostscriptService } from './ghostscript-service';
 
 // Lazy-initialized service instances
 let _approvalService: ApprovalService | null = null;
@@ -24,6 +28,10 @@ let _auditService: AuditService | null = null;
 let _systemConfigService: SystemConfigService | null = null;
 let _pricingService: PricingService | null = null;
 let _backupService: BackupService | null = null;
+let _pdfAnalyzerService: PdfAnalyzerService | null = null;
+let _pdfFixerService: PdfFixerService | null = null;
+let _emailNotificationService: EmailNotificationService | null = null;
+let _ghostscriptService: GhostscriptService | null = null;
 
 export function getApprovalService(): ApprovalService {
     if (!_approvalService) {
@@ -88,6 +96,34 @@ export function getBackupService(): BackupService {
     return _backupService;
 }
 
+export function getPdfAnalyzer(): PdfAnalyzerService {
+    if (!_pdfAnalyzerService) {
+        _pdfAnalyzerService = new PdfAnalyzerService();
+    }
+    return _pdfAnalyzerService;
+}
+
+export function getPdfFixer(): PdfFixerService {
+    if (!_pdfFixerService) {
+        _pdfFixerService = new PdfFixerService(getPdfAnalyzer(), getGhostscriptService());
+    }
+    return _pdfFixerService;
+}
+
+export function getEmailService(): EmailNotificationService {
+    if (!_emailNotificationService) {
+        _emailNotificationService = new EmailNotificationService();
+    }
+    return _emailNotificationService;
+}
+
+export function getGhostscriptService(): GhostscriptService {
+    if (!_ghostscriptService) {
+        _ghostscriptService = new GhostscriptService();
+    }
+    return _ghostscriptService;
+}
+
 // Legacy exports for backward compatibility
 export const approvalService = { get: getApprovalService };
 export const jobQueueService = { get: getJobQueueService };
@@ -98,3 +134,7 @@ export const auditService = { get: getAuditService };
 export const systemConfigService = { get: getSystemConfigService };
 export const pricingService = { get: getPricingService };
 export const backupService = { get: getBackupService };
+export const pdfAnalyzer = { get: getPdfAnalyzer };
+export const pdfFixer = { get: getPdfFixer };
+export const emailService = { get: getEmailService };
+export const ghostscript = { get: getGhostscriptService };

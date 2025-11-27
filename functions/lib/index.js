@@ -42,7 +42,6 @@ const admin = __importStar(require("firebase-admin"));
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
-const pdf_fixer_1 = require("./services/pdf-fixer");
 const service_instances_1 = require("./services/service-instances");
 const queue_worker_1 = require("./workers/queue-worker");
 const busboy_1 = __importDefault(require("busboy"));
@@ -89,9 +88,8 @@ app.post('/api/v1/analyze-pdf', async (req, res) => {
                 return res.status(400).json({ error: 'No file uploaded' });
             }
             const fileBuffer = fs.readFileSync(filePath);
-            // Import analyzer dynamically
-            const { pdfAnalyzer } = await Promise.resolve().then(() => __importStar(require('./services/pdf-analyzer')));
-            const analysis = await pdfAnalyzer.analyzeDocument(fileBuffer);
+            // Use lazy-loaded analyzer
+            const analysis = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(fileBuffer);
             // Cleanup
             fs.unlinkSync(filePath);
             res.json({ success: true, analysis });
@@ -160,7 +158,7 @@ app.post('/api/v1/fix-pdf', async (req, res) => {
             }
             const fileBuffer = fs.readFileSync(filePath);
             // Process PDF with fixes and get analysis
-            const result = await pdf_fixer_1.pdfFixer.processPdfWithAnalysis(fileBuffer, fixTypes, options);
+            const result = await (0, service_instances_1.getPdfFixer)().processPdfWithAnalysis(fileBuffer, fixTypes, options);
             // Upload fixed PDF to Firebase Storage
             const bucket = admin.storage().bucket();
             const filename = `fixed/${Date.now()}_fixed.pdf`;

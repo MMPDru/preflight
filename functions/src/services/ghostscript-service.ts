@@ -266,4 +266,4 @@ export class GhostscriptService {
     }
 }
 
-export const ghostscript = new GhostscriptService();
+

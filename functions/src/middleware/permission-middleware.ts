@@ -4,11 +4,16 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { permissionService } from '../services/permission-service';
-import { auditService } from '../services/audit-service';
+import { getPermissionService, getAuditService } from '../services/service-instances';
 import type { PermissionAction } from '../types/admin-types';
 
-/**
+export interface AuthenticatedRequest extends Request {
+    user?: {
+        uid: string;
+        email?: string;
+        role?: string;
+    };
+}/**
  * Middleware to check if user has required permission
  */
 export function requirePermission(resource: string, action: PermissionAction) {
@@ -22,7 +27,7 @@ export function requirePermission(resource: string, action: PermissionAction) {
             }
 
             // Check permission
-            const result = await permissionService.checkPermission({
+            const result = await getPermissionService().checkPermission({
                 userId,
                 resource,
                 action,
@@ -30,7 +35,7 @@ export function requirePermission(resource: string, action: PermissionAction) {
 
             if (!result.allowed) {
                 // Log unauthorized access attempt
-                await auditService.log(
+                await getAuditService().log(
                     userId,
                     userId,
                     'read',
@@ -71,7 +76,7 @@ export function requireAnyPermission(permissions: Array<{ resource: string; acti
 
             // Check each permission
             for (const perm of permissions) {
-                const result = await permissionService.checkPermission({
+                const result = await getPermissionService().checkPermission({
                     userId,
                     resource: perm.resource,
                     action: perm.action,
@@ -84,7 +89,7 @@ export function requireAnyPermission(permissions: Array<{ resource: string; acti
             }
 
             // No permissions granted
-            await auditService.log(
+            await getAuditService().log(
                 userId,
                 userId,
                 'read',
@@ -119,17 +124,17 @@ export function requireRole(roleId: string) {
             }
 
             // Get user permissions
-            const userPerms = await permissionService.getUserPermissions(userId);
+            const userPermissions = await getPermissionService().getUserPermissions(userId);
 
-            if (!userPerms || userPerms.roleId !== roleId) {
-                await auditService.log(
+            if (!userPermissions || userPermissions.roleId !== roleId) {
+                await getAuditService().log(
                     userId,
                     userId,
                     'read',
                     'roles',
                     'access-denied',
                     {
-                        metadata: { requiredRole: roleId, actualRole: userPerms?.roleId },
+                        metadata: { requiredRole: roleId, actualRole: userPermissions?.roleId },
                         severity: 'high',
                     }
                 );

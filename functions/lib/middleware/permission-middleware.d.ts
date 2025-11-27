@@ -4,7 +4,13 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import type { PermissionAction } from '../types/admin-types';
-/**
+export interface AuthenticatedRequest extends Request {
+    user?: {
+        uid: string;
+        email?: string;
+        role?: string;
+    };
+} /**
  * Middleware to check if user has required permission
  */
 export declare function requirePermission(resource: string, action: PermissionAction): (req: Request, res: Response, next: NextFunction) => Promise<Response<any, Record<string, any>> | undefined>;

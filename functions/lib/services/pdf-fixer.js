@@ -33,22 +33,24 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.pdfFixer = exports.PdfFixerService = void 0;
+exports.PdfFixerService = void 0;
 const pdf_lib_1 = require("pdf-lib");
-const pdf_analyzer_1 = require("./pdf-analyzer");
 const font_processor_1 = require("../utils/font-processor");
-const ghostscript_service_1 = require("./ghostscript-service");
 // NOTE: In a full production environment (Google Cloud Run), we would use Ghostscript
 // to handle CMYK conversion and Image Resampling.
 // Since we are in a standard Node.js environment (Firebase Functions), we use pdf-lib
 // to perform structural fixes and metadata compliance.
 class PdfFixerService {
+    constructor(pdfAnalyzer, ghostscript) {
+        this.pdfAnalyzer = pdfAnalyzer;
+        this.ghostscript = ghostscript;
+    }
     /**
      * Process PDF with fixes and return analysis report
      */
     async processPdfWithAnalysis(fileBuffer, operations, options) {
         const buffer = await this.processPdf(fileBuffer, operations, options);
-        const analysis = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(buffer);
+        const analysis = await this.pdfAnalyzer.analyzeDocument(buffer);
         return { buffer, analysis };
     }
     async processPdf(fileBuffer, operations, options) {
@@ -200,7 +202,7 @@ class PdfFixerService {
     }
     async convertToCMYK(pdfDoc) {
         // Check if Ghostscript is available for actual conversion
-        const gsAvailable = await ghostscript_service_1.ghostscript.isInstalled();
+        const gsAvailable = await this.ghostscript.isInstalled();
         if (gsAvailable) {
             console.log('Using Ghostscript for actual RGB to CMYK conversion');
             // Note: This would require saving pdfDoc to buffer, processing, and reloading
@@ -234,7 +236,7 @@ class PdfFixerService {
     }
     async resampleImages(pdfDoc) {
         // Check if Ghostscript is available for actual resampling
-        const gsAvailable = await ghostscript_service_1.ghostscript.isInstalled();
+        const gsAvailable = await this.ghostscript.isInstalled();
         if (gsAvailable) {
             console.log('Ghostscript available for image resampling');
             // Actual resampling would be done via processBuffer in the main processPdf method
@@ -314,7 +316,7 @@ class PdfFixerService {
      */
     async flattenTransparency(pdfDoc) {
         // Check if Ghostscript is available for actual flattening
-        const gsAvailable = await ghostscript_service_1.ghostscript.isInstalled();
+        const gsAvailable = await this.ghostscript.isInstalled();
         if (gsAvailable) {
             console.log('Ghostscript available for transparency flattening');
             // Actual flattening would be done via processBuffer in the main processPdf method
@@ -383,5 +385,4 @@ class PdfFixerService {
     }
 }
 exports.PdfFixerService = PdfFixerService;
-exports.pdfFixer = new PdfFixerService();
 //# sourceMappingURL=pdf-fixer.js.map

@@ -3,7 +3,7 @@
  * Unit Tests for PDF Analyzer Service
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-const pdf_analyzer_1 = require("../services/pdf-analyzer");
+const service_instances_1 = require("../services/service-instances");
 const pdf_lib_1 = require("pdf-lib");
 describe('PDF Analyzer Service', () => {
     let testPdfBuffer;
@@ -17,7 +17,7 @@ describe('PDF Analyzer Service', () => {
     });
     describe('analyzeDocument', () => {
         it('should return a complete PreFlightReport', async () => {
-            const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(testPdfBuffer);
+            const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(testPdfBuffer);
             expect(report).toBeDefined();
             expect(report.documentInfo).toBeDefined();
             expect(report.colorSpaceAnalysis).toBeDefined();
@@ -34,22 +34,22 @@ describe('PDF Analyzer Service', () => {
             expect(report.processingTime).toBeGreaterThan(0);
         });
         it('should extract correct document info', async () => {
-            const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(testPdfBuffer);
+            const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(testPdfBuffer);
             expect(report.documentInfo.pageCount).toBe(1);
             expect(report.documentInfo.fileSize).toBeGreaterThan(0);
         });
         it('should detect color spaces', async () => {
-            const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(testPdfBuffer);
+            const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(testPdfBuffer);
             expect(report.colorSpaceAnalysis.dominantColorSpace).toBeDefined();
             expect(['RGB', 'CMYK', 'Grayscale', 'Mixed']).toContain(report.colorSpaceAnalysis.dominantColorSpace);
         });
         it('should validate page boxes', async () => {
-            const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(testPdfBuffer);
+            const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(testPdfBuffer);
             expect(report.pageBoxValidation).toHaveLength(1);
             expect(report.pageBoxValidation[0].hasMediaBox).toBe(true);
         });
         it('should generate issues for non-compliant PDFs', async () => {
-            const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(testPdfBuffer);
+            const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(testPdfBuffer);
             expect(Array.isArray(report.issues)).toBe(true);
             expect(Array.isArray(report.warnings)).toBe(true);
             expect(Array.isArray(report.recommendations)).toBe(true);
@@ -58,7 +58,7 @@ describe('PDF Analyzer Service', () => {
     describe('Performance', () => {
         it('should complete analysis in reasonable time', async () => {
             const startTime = Date.now();
-            await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(testPdfBuffer);
+            await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(testPdfBuffer);
             const endTime = Date.now();
             const processingTime = endTime - startTime;
             expect(processingTime).toBeLessThan(5000); // Should complete in < 5 seconds
@@ -71,7 +71,7 @@ describe('Color Space Analysis', () => {
         const pdfDoc = await pdf_lib_1.PDFDocument.create();
         const page = pdfDoc.addPage();
         const pdfBytes = await pdfDoc.save();
-        const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(Buffer.from(pdfBytes));
+        const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(Buffer.from(pdfBytes));
         expect(report.colorSpaceAnalysis).toBeDefined();
     });
 });
@@ -81,7 +81,7 @@ describe('Font Analysis', () => {
         const page = pdfDoc.addPage();
         page.drawText('Test with default font', { x: 50, y: 700 });
         const pdfBytes = await pdfDoc.save();
-        const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(Buffer.from(pdfBytes));
+        const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(Buffer.from(pdfBytes));
         expect(Array.isArray(report.fontAnalysis)).toBe(true);
     });
 });
@@ -90,7 +90,7 @@ describe('PDF/X Compliance', () => {
         const pdfDoc = await pdf_lib_1.PDFDocument.create();
         const page = pdfDoc.addPage();
         const pdfBytes = await pdfDoc.save();
-        const report = await pdf_analyzer_1.pdfAnalyzer.analyzeDocument(Buffer.from(pdfBytes));
+        const report = await (0, service_instances_1.getPdfAnalyzer)().analyzeDocument(Buffer.from(pdfBytes));
         expect(report.pdfxCompliance).toBeDefined();
         expect(report.pdfxCompliance.standard).toBeDefined();
         expect(Array.isArray(report.pdfxCompliance.violations)).toBe(true);

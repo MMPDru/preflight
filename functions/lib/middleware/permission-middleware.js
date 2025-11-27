@@ -8,11 +8,7 @@ exports.requireSuperAdmin = exports.requireAdmin = void 0;
 exports.requirePermission = requirePermission;
 exports.requireAnyPermission = requireAnyPermission;
 exports.requireRole = requireRole;
-const permission_service_1 = require("../services/permission-service");
-const audit_service_1 = require("../services/audit-service");
-/**
- * Middleware to check if user has required permission
- */
+const service_instances_1 = require("../services/service-instances");
 function requirePermission(resource, action) {
     return async (req, res, next) => {
         try {
@@ -22,14 +18,14 @@ function requirePermission(resource, action) {
                 return res.status(401).json({ error: 'Unauthorized - User ID required' });
             }
             // Check permission
-            const result = await permission_service_1.permissionService.checkPermission({
+            const result = await (0, service_instances_1.getPermissionService)().checkPermission({
                 userId,
                 resource,
                 action,
             });
             if (!result.allowed) {
                 // Log unauthorized access attempt
-                await audit_service_1.auditService.log(userId, userId, 'read', resource, 'access-denied', {
+                await (0, service_instances_1.getAuditService)().log(userId, userId, 'read', resource, 'access-denied', {
                     metadata: { reason: result.reason, action },
                     severity: 'high',
                 });
@@ -59,7 +55,7 @@ function requireAnyPermission(permissions) {
             }
             // Check each permission
             for (const perm of permissions) {
-                const result = await permission_service_1.permissionService.checkPermission({
+                const result = await (0, service_instances_1.getPermissionService)().checkPermission({
                     userId,
                     resource: perm.resource,
                     action: perm.action,
@@ -70,7 +66,7 @@ function requireAnyPermission(permissions) {
                 }
             }
             // No permissions granted
-            await audit_service_1.auditService.log(userId, userId, 'read', 'multiple', 'access-denied', {
+            await (0, service_instances_1.getAuditService)().log(userId, userId, 'read', 'multiple', 'access-denied', {
                 metadata: { permissions },
                 severity: 'high',
             });
@@ -95,10 +91,10 @@ function requireRole(roleId) {
                 return res.status(401).json({ error: 'Unauthorized - User ID required' });
             }
             // Get user permissions
-            const userPerms = await permission_service_1.permissionService.getUserPermissions(userId);
-            if (!userPerms || userPerms.roleId !== roleId) {
-                await audit_service_1.auditService.log(userId, userId, 'read', 'roles', 'access-denied', {
-                    metadata: { requiredRole: roleId, actualRole: userPerms?.roleId },
+            const userPermissions = await (0, service_instances_1.getPermissionService)().getUserPermissions(userId);
+            if (!userPermissions || userPermissions.roleId !== roleId) {
+                await (0, service_instances_1.getAuditService)().log(userId, userId, 'read', 'roles', 'access-denied', {
+                    metadata: { requiredRole: roleId, actualRole: userPermissions?.roleId },
                     severity: 'high',
                 });
                 return res.status(403).json({

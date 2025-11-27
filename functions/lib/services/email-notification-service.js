@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.emailService = exports.EmailNotificationService = void 0;
+exports.EmailNotificationService = void 0;
 const admin = __importStar(require("firebase-admin"));
 class EmailNotificationService {
     constructor() {
@@ -542,5 +542,4 @@ PreFlight Pro Team
 }
 exports.EmailNotificationService = EmailNotificationService;
 // Export singleton
-exports.emailService = new EmailNotificationService();
 //# sourceMappingURL=email-notification-service.js.map

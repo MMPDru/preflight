@@ -41,5 +41,4 @@ export declare class BackupService {
      */
     cleanupOldBackups(olderThanDays: number): Promise<number>;
 }
-export declare const backupService: BackupService;
 //# sourceMappingURL=backup-service.d.ts.map

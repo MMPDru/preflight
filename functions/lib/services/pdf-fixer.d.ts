@@ -1,5 +1,10 @@
+import { PdfAnalyzerService } from './pdf-analyzer';
+import { GhostscriptService } from './ghostscript-service';
 import type { PreFlightReport, FixOptions } from '../types/preflight-types';
 export declare class PdfFixerService {
+    private pdfAnalyzer;
+    private ghostscript;
+    constructor(pdfAnalyzer: PdfAnalyzerService, ghostscript: GhostscriptService);
     /**
      * Process PDF with fixes and return analysis report
      */
@@ -40,5 +45,4 @@ export declare class PdfFixerService {
      */
     private makePDFXCompliant;
 }
-export declare const pdfFixer: PdfFixerService;
 //# sourceMappingURL=pdf-fixer.d.ts.map

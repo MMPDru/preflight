@@ -12,6 +12,10 @@ export interface Deployment {
 }
 export declare class AutoDocumentationSystem {
     /**
+     * Get Firestore instance lazily
+     */
+    private get db();
+    /**
      * Main handler triggered on deployment
      */
     onDeployment(deployment: Deployment): Promise<void>;
@@ -52,7 +56,7 @@ export declare class AutoDocumentationSystem {
      */
     private generateSupportActions;
 }
-export declare const autoDocSystem: AutoDocumentationSystem;
+export declare function getAutoDocSystem(): AutoDocumentationSystem;
 /**
  * Firebase Cloud Function: Deployment Webhook
  * Triggered when a new deployment is detected

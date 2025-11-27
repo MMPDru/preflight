@@ -2,232 +2,232 @@ import * as admin from 'firebase-admin';
 
 // Types
 export interface EmailTemplate {
-    subject: string;
-    html: string;
-    text: string;
+  subject: string;
+  html: string;
+  text: string;
 }
 
 export interface EmailRecipient {
-    email: string;
-    name: string;
+  email: string;
+  name: string;
 }
 
 export interface ProofReadyNotification {
-    customerName: string;
-    customerEmail: string;
-    jobName: string;
-    proofUrl: string;
-    deadline?: Date;
-    message?: string;
+  customerName: string;
+  customerEmail: string;
+  jobName: string;
+  proofUrl: string;
+  deadline?: Date;
+  message?: string;
 }
 
 export interface ReminderNotification {
-    recipientName: string;
-    recipientEmail: string;
-    jobName: string;
-    proofUrl: string;
-    daysRemaining: number;
-    deadline: Date;
+  recipientName: string;
+  recipientEmail: string;
+  jobName: string;
+  proofUrl: string;
+  daysRemaining: number;
+  deadline: Date;
 }
 
 export interface IssueAlertNotification {
-    customerName: string;
-    customerEmail: string;
-    jobName: string;
-    issues: Array<{
-        title: string;
-        severity: string;
-        recommendation: string;
-    }>;
-    fixRecommendations: string[];
+  customerName: string;
+  customerEmail: string;
+  jobName: string;
+  issues: Array<{
+    title: string;
+    severity: string;
+    recommendation: string;
+  }>;
+  fixRecommendations: string[];
 }
 
 export interface RevisionNotification {
-    designerName: string;
-    designerEmail: string;
-    jobName: string;
-    customerName: string;
-    revisionNotes: string[];
-    priority: 'low' | 'medium' | 'high' | 'urgent';
+  designerName: string;
+  designerEmail: string;
+  jobName: string;
+  customerName: string;
+  revisionNotes: string[];
+  priority: 'low' | 'medium' | 'high' | 'urgent';
 }
 
 export interface ApprovalConfirmation {
-    customerName: string;
-    customerEmail: string;
-    jobName: string;
-    approvedBy: string;
-    approvedAt: Date;
-    nextSteps: string;
+  customerName: string;
+  customerEmail: string;
+  jobName: string;
+  approvedBy: string;
+  approvedAt: Date;
+  nextSteps: string;
 }
 
 export class EmailNotificationService {
-    private db = admin.firestore();
+  private db = admin.firestore();
 
-    /**
-     * Send proof ready notification
-     */
-    async sendProofReadyNotification(data: ProofReadyNotification): Promise<void> {
-        const template = this.getProofReadyTemplate(data);
+  /**
+   * Send proof ready notification
+   */
+  async sendProofReadyNotification(data: ProofReadyNotification): Promise<void> {
+    const template = this.getProofReadyTemplate(data);
 
-        await this.sendEmail({
-            to: { email: data.customerEmail, name: data.customerName },
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
+    await this.sendEmail({
+      to: { email: data.customerEmail, name: data.customerName },
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
 
-        // Log notification
-        await this.logNotification({
-            type: 'proof-ready',
-            recipient: data.customerEmail,
-            jobName: data.jobName,
-            sentAt: new Date()
-        });
+    // Log notification
+    await this.logNotification({
+      type: 'proof-ready',
+      recipient: data.customerEmail,
+      jobName: data.jobName,
+      sentAt: new Date()
+    });
 
-        console.log(`✅ Proof ready notification sent to ${data.customerEmail}`);
-    }
+    console.log(`✅ Proof ready notification sent to ${data.customerEmail}`);
+  }
 
-    /**
-     * Send reminder email
-     */
-    async sendReminderNotification(data: ReminderNotification): Promise<void> {
-        const template = this.getReminderTemplate(data);
+  /**
+   * Send reminder email
+   */
+  async sendReminderNotification(data: ReminderNotification): Promise<void> {
+    const template = this.getReminderTemplate(data);
 
-        await this.sendEmail({
-            to: { email: data.recipientEmail, name: data.recipientName },
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
+    await this.sendEmail({
+      to: { email: data.recipientEmail, name: data.recipientName },
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
 
-        await this.logNotification({
-            type: 'reminder',
-            recipient: data.recipientEmail,
-            jobName: data.jobName,
-            sentAt: new Date()
-        });
+    await this.logNotification({
+      type: 'reminder',
+      recipient: data.recipientEmail,
+      jobName: data.jobName,
+      sentAt: new Date()
+    });
 
-        console.log(`✅ Reminder sent to ${data.recipientEmail}`);
-    }
+    console.log(`✅ Reminder sent to ${data.recipientEmail}`);
+  }
 
-    /**
-     * Send issue alert
-     */
-    async sendIssueAlert(data: IssueAlertNotification): Promise<void> {
-        const template = this.getIssueAlertTemplate(data);
+  /**
+   * Send issue alert
+   */
+  async sendIssueAlert(data: IssueAlertNotification): Promise<void> {
+    const template = this.getIssueAlertTemplate(data);
 
-        await this.sendEmail({
-            to: { email: data.customerEmail, name: data.customerName },
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
+    await this.sendEmail({
+      to: { email: data.customerEmail, name: data.customerName },
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
 
-        await this.logNotification({
-            type: 'issue-alert',
-            recipient: data.customerEmail,
-            jobName: data.jobName,
-            sentAt: new Date()
-        });
+    await this.logNotification({
+      type: 'issue-alert',
+      recipient: data.customerEmail,
+      jobName: data.jobName,
+      sentAt: new Date()
+    });
 
-        console.log(`✅ Issue alert sent to ${data.customerEmail}`);
-    }
+    console.log(`✅ Issue alert sent to ${data.customerEmail}`);
+  }
 
-    /**
-     * Send revision notification to designer
-     */
-    async sendRevisionNotification(data: RevisionNotification): Promise<void> {
-        const template = this.getRevisionTemplate(data);
+  /**
+   * Send revision notification to designer
+   */
+  async sendRevisionNotification(data: RevisionNotification): Promise<void> {
+    const template = this.getRevisionTemplate(data);
 
-        await this.sendEmail({
-            to: { email: data.designerEmail, name: data.designerName },
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
+    await this.sendEmail({
+      to: { email: data.designerEmail, name: data.designerName },
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
 
-        await this.logNotification({
-            type: 'revision-request',
-            recipient: data.designerEmail,
-            jobName: data.jobName,
-            sentAt: new Date()
-        });
+    await this.logNotification({
+      type: 'revision-request',
+      recipient: data.designerEmail,
+      jobName: data.jobName,
+      sentAt: new Date()
+    });
 
-        console.log(`✅ Revision notification sent to ${data.designerEmail}`);
-    }
+    console.log(`✅ Revision notification sent to ${data.designerEmail}`);
+  }
 
-    /**
-     * Send approval confirmation
-     */
-    async sendApprovalConfirmation(data: ApprovalConfirmation): Promise<void> {
-        const template = this.getApprovalTemplate(data);
+  /**
+   * Send approval confirmation
+   */
+  async sendApprovalConfirmation(data: ApprovalConfirmation): Promise<void> {
+    const template = this.getApprovalTemplate(data);
 
-        await this.sendEmail({
-            to: { email: data.customerEmail, name: data.customerName },
-            subject: template.subject,
-            html: template.html,
-            text: template.text
-        });
+    await this.sendEmail({
+      to: { email: data.customerEmail, name: data.customerName },
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
 
-        await this.logNotification({
-            type: 'approval-confirmation',
-            recipient: data.customerEmail,
-            jobName: data.jobName,
-            sentAt: new Date()
-        });
+    await this.logNotification({
+      type: 'approval-confirmation',
+      recipient: data.customerEmail,
+      jobName: data.jobName,
+      sentAt: new Date()
+    });
 
-        console.log(`✅ Approval confirmation sent to ${data.customerEmail}`);
-    }
+    console.log(`✅ Approval confirmation sent to ${data.customerEmail}`);
+  }
 
-    /**
-     * Send email using Firebase or external service
-     */
-    private async sendEmail(params: {
-        to: EmailRecipient;
-        subject: string;
-        html: string;
-        text: string;
-    }): Promise<void> {
-        // In production, integrate with SendGrid, AWS SES, or similar
-        // For now, we'll queue it in Firestore for processing
+  /**
+   * Send email using Firebase or external service
+   */
+  private async sendEmail(params: {
+    to: EmailRecipient;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void> {
+    // In production, integrate with SendGrid, AWS SES, or similar
+    // For now, we'll queue it in Firestore for processing
 
-        await this.db.collection('emailQueue').add({
-            to: params.to.email,
-            toName: params.to.name,
-            subject: params.subject,
-            html: params.html,
-            text: params.text,
-            status: 'pending',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            attempts: 0
-        });
-    }
+    await this.db.collection('emailQueue').add({
+      to: params.to.email,
+      toName: params.to.name,
+      subject: params.subject,
+      html: params.html,
+      text: params.text,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      attempts: 0
+    });
+  }
 
-    /**
-     * Log notification for tracking
-     */
-    private async logNotification(data: any): Promise<void> {
-        await this.db.collection('notificationLogs').add({
-            ...data,
-            timestamp: admin.firestore.FieldValue.serverTimestamp()
-        });
-    }
+  /**
+   * Log notification for tracking
+   */
+  private async logNotification(data: any): Promise<void> {
+    await this.db.collection('notificationLogs').add({
+      ...data,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+  }
 
-    /**
-     * Get proof ready email template
-     */
-    private getProofReadyTemplate(data: ProofReadyNotification): EmailTemplate {
-        const deadlineText = data.deadline
-            ? `<p><strong>Deadline:</strong> ${data.deadline.toLocaleDateString()}</p>`
-            : '';
+  /**
+   * Get proof ready email template
+   */
+  private getProofReadyTemplate(data: ProofReadyNotification): EmailTemplate {
+    const deadlineText = data.deadline
+      ? `<p><strong>Deadline:</strong> ${data.deadline.toLocaleDateString()}</p>`
+      : '';
 
-        const messageText = data.message
-            ? `<p>${data.message}</p>`
-            : '';
+    const messageText = data.message
+      ? `<p>${data.message}</p>`
+      : '';
 
-        return {
-            subject: `Your Proof is Ready: ${data.jobName}`,
-            html: `
+    return {
+      subject: `Your Proof is Ready: ${data.jobName}`,
+      html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -278,7 +278,7 @@ export class EmailNotificationService {
         </body>
         </html>
       `,
-            text: `
+      text: `
 Hi ${data.customerName},
 
 Your proof for ${data.jobName} is ready for review.
@@ -293,18 +293,18 @@ Please review and provide your approval or feedback.
 Best regards,
 PreFlight Pro Team
       `
-        };
-    }
+    };
+  }
 
-    /**
-     * Get reminder email template
-     */
-    private getReminderTemplate(data: ReminderNotification): EmailTemplate {
-        const urgency = data.daysRemaining <= 1 ? 'URGENT' : 'Reminder';
+  /**
+   * Get reminder email template
+   */
+  private getReminderTemplate(data: ReminderNotification): EmailTemplate {
+    const urgency = data.daysRemaining <= 1 ? 'URGENT' : 'Reminder';
 
-        return {
-            subject: `${urgency}: Proof Approval Needed - ${data.jobName}`,
-            html: `
+    return {
+      subject: `${urgency}: Proof Approval Needed - ${data.jobName}`,
+      html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -350,7 +350,7 @@ PreFlight Pro Team
         </body>
         </html>
       `,
-            text: `
+      text: `
 Hi ${data.recipientName},
 
 ${urgency}: Your proof for ${data.jobName} needs approval.
@@ -365,25 +365,25 @@ Please review and approve as soon as possible to avoid production delays.
 Best regards,
 PreFlight Pro Team
       `
-        };
-    }
+    };
+  }
 
-    /**
-     * Get issue alert template
-     */
-    private getIssueAlertTemplate(data: IssueAlertNotification): EmailTemplate {
-        const issuesList = data.issues.map(issue => `
+  /**
+   * Get issue alert template
+   */
+  private getIssueAlertTemplate(data: IssueAlertNotification): EmailTemplate {
+    const issuesList = data.issues.map(issue => `
       <li>
         <strong>${issue.title}</strong> (${issue.severity})<br>
         <em>${issue.recommendation}</em>
       </li>
     `).join('');
 
-        const fixesList = data.fixRecommendations.map(fix => `<li>${fix}</li>`).join('');
+    const fixesList = data.fixRecommendations.map(fix => `<li>${fix}</li>`).join('');
 
-        return {
-            subject: `Issues Detected: ${data.jobName}`,
-            html: `
+    return {
+      subject: `Issues Detected: ${data.jobName}`,
+      html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -426,7 +426,7 @@ PreFlight Pro Team
         </body>
         </html>
       `,
-            text: `
+      text: `
 Hi ${data.customerName},
 
 Issues detected in ${data.jobName}:
@@ -441,25 +441,25 @@ Our team is working on these fixes. You'll receive an updated proof shortly.
 Best regards,
 PreFlight Pro Team
       `
-        };
-    }
+    };
+  }
 
-    /**
-     * Get revision notification template
-     */
-    private getRevisionTemplate(data: RevisionNotification): EmailTemplate {
-        const priorityColor = {
-            low: '#22c55e',
-            medium: '#f59e0b',
-            high: '#ef4444',
-            urgent: '#dc2626'
-        }[data.priority];
+  /**
+   * Get revision notification template
+   */
+  private getRevisionTemplate(data: RevisionNotification): EmailTemplate {
+    const priorityColor = {
+      low: '#22c55e',
+      medium: '#f59e0b',
+      high: '#ef4444',
+      urgent: '#dc2626'
+    }[data.priority];
 
-        const revisionsList = data.revisionNotes.map((note, i) => `<li>${i + 1}. ${note}</li>`).join('');
+    const revisionsList = data.revisionNotes.map((note, i) => `<li>${i + 1}. ${note}</li>`).join('');
 
-        return {
-            subject: `[${data.priority.toUpperCase()}] Revision Request: ${data.jobName}`,
-            html: `
+    return {
+      subject: `[${data.priority.toUpperCase()}] Revision Request: ${data.jobName}`,
+      html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -497,7 +497,7 @@ PreFlight Pro Team
         </body>
         </html>
       `,
-            text: `
+      text: `
 Hi ${data.designerName},
 
 Revision request for ${data.jobName} from ${data.customerName}.
@@ -512,16 +512,16 @@ Please implement these changes and upload a new proof.
 Best regards,
 PreFlight Pro Team
       `
-        };
-    }
+    };
+  }
 
-    /**
-     * Get approval confirmation template
-     */
-    private getApprovalTemplate(data: ApprovalConfirmation): EmailTemplate {
-        return {
-            subject: `✅ Proof Approved: ${data.jobName}`,
-            html: `
+  /**
+   * Get approval confirmation template
+   */
+  private getApprovalTemplate(data: ApprovalConfirmation): EmailTemplate {
+    return {
+      subject: `✅ Proof Approved: ${data.jobName}`,
+      html: `
         <!DOCTYPE html>
         <html>
         <head>
@@ -561,7 +561,7 @@ PreFlight Pro Team
         </body>
         </html>
       `,
-            text: `
+      text: `
 Hi ${data.customerName},
 
 ✅ Your proof for ${data.jobName} has been approved!
@@ -577,37 +577,37 @@ Your job is now in production. We'll keep you updated.
 Best regards,
 PreFlight Pro Team
       `
-        };
+    };
+  }
+
+  /**
+   * Schedule reminder emails
+   */
+  async scheduleReminders(jobId: string, deadline: Date): Promise<void> {
+    const now = new Date();
+    const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Schedule reminders at 3 days, 1 day, and on deadline
+    const reminderDays = [3, 1, 0];
+
+    for (const days of reminderDays) {
+      if (daysUntilDeadline >= days) {
+        const reminderDate = new Date(deadline);
+        reminderDate.setDate(reminderDate.getDate() - days);
+
+        await this.db.collection('scheduledReminders').add({
+          jobId,
+          scheduledFor: reminderDate,
+          daysBeforeDeadline: days,
+          sent: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
     }
 
-    /**
-     * Schedule reminder emails
-     */
-    async scheduleReminders(jobId: string, deadline: Date): Promise<void> {
-        const now = new Date();
-        const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-        // Schedule reminders at 3 days, 1 day, and on deadline
-        const reminderDays = [3, 1, 0];
-
-        for (const days of reminderDays) {
-            if (daysUntilDeadline >= days) {
-                const reminderDate = new Date(deadline);
-                reminderDate.setDate(reminderDate.getDate() - days);
-
-                await this.db.collection('scheduledReminders').add({
-                    jobId,
-                    scheduledFor: reminderDate,
-                    daysBeforeDeadline: days,
-                    sent: false,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-            }
-        }
-
-        console.log(`✅ Scheduled ${reminderDays.length} reminders for job ${jobId}`);
-    }
+    console.log(`✅ Scheduled ${reminderDays.length} reminders for job ${jobId}`);
+  }
 }
 
 // Export singleton
-export const emailService = new EmailNotificationService();
+
