@@ -40,42 +40,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let mounted = true;
+
         // Set timeout to prevent infinite loading
         const timeout = setTimeout(() => {
-            setLoading(false);
+            if (mounted) {
+                console.warn('Auth loading timed out, forcing render');
+                setLoading(false);
+            }
         }, 5000);
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            clearTimeout(timeout);
-
-            if (firebaseUser) {
-                try {
+            try {
+                if (firebaseUser) {
                     // User is signed in, fetch user data from Firestore
-                    const userData = await userService.getById(firebaseUser.uid);
+                    // Add a timeout to the Firestore fetch as well
+                    const fetchPromise = userService.getById(firebaseUser.uid);
+                    const timeoutPromise = new Promise<null>((resolve) =>
+                        setTimeout(() => resolve(null), 4000)
+                    );
 
-                    if (userData) {
-                        // Update last login
-                        await userService.update(firebaseUser.uid, {
-                            lastLogin: Timestamp.now(),
-                        });
-                        setCurrentUser(userData);
-                    } else {
-                        // User exists in Auth but not in Firestore (shouldn't happen)
-                        console.error('User not found in Firestore');
-                        setCurrentUser(null);
+                    const userData = await Promise.race([fetchPromise, timeoutPromise]);
+
+                    if (mounted) {
+                        if (userData) {
+                            // Update last login
+                            userService.update(firebaseUser.uid, {
+                                lastLogin: Timestamp.now(),
+                            }).catch(console.error); // Don't await this
+                            setCurrentUser(userData);
+                        } else {
+                            // User exists in Auth but not in Firestore
+                            console.error('User not found in Firestore');
+                            // If we can't find the user profile, we treat them as not logged in
+                            // or we could create a basic profile here. 
+                            // For now, let's sign them out to force a clean slate if the DB was wiped.
+                            await signOut(auth);
+                            setCurrentUser(null);
+                        }
                     }
-                } catch (error) {
-                    console.error('Error fetching user data:', error);
-                    setCurrentUser(null);
+                } else {
+                    // User is signed out
+                    if (mounted) setCurrentUser(null);
                 }
-            } else {
-                // User is signed out
-                setCurrentUser(null);
+            } catch (error) {
+                console.error('Error in auth state change:', error);
+                if (mounted) setCurrentUser(null);
+            } finally {
+                if (mounted) {
+                    clearTimeout(timeout);
+                    setLoading(false);
+                }
             }
-            setLoading(false);
         });
 
         return () => {
+            mounted = false;
             clearTimeout(timeout);
             unsubscribe();
         };
