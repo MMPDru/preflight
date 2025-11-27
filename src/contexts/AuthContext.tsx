@@ -40,20 +40,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (firebaseUser) {
-                // User is signed in, fetch user data from Firestore
-                const userData = await userService.getById(firebaseUser.uid);
+        // Set timeout to prevent infinite loading
+        const timeout = setTimeout(() => {
+            setLoading(false);
+        }, 5000);
 
-                if (userData) {
-                    // Update last login
-                    await userService.update(firebaseUser.uid, {
-                        lastLogin: Timestamp.now(),
-                    });
-                    setCurrentUser(userData);
-                } else {
-                    // User exists in Auth but not in Firestore (shouldn't happen)
-                    console.error('User not found in Firestore');
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            clearTimeout(timeout);
+
+            if (firebaseUser) {
+                try {
+                    // User is signed in, fetch user data from Firestore
+                    const userData = await userService.getById(firebaseUser.uid);
+
+                    if (userData) {
+                        // Update last login
+                        await userService.update(firebaseUser.uid, {
+                            lastLogin: Timestamp.now(),
+                        });
+                        setCurrentUser(userData);
+                    } else {
+                        // User exists in Auth but not in Firestore (shouldn't happen)
+                        console.error('User not found in Firestore');
+                        setCurrentUser(null);
+                    }
+                } catch (error) {
+                    console.error('Error fetching user data:', error);
                     setCurrentUser(null);
                 }
             } else {
@@ -63,7 +75,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             setLoading(false);
         });
 
-        return unsubscribe;
+        return () => {
+            clearTimeout(timeout);
+            unsubscribe();
+        };
     }, []);
 
     const signup = async (
