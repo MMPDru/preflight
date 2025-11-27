@@ -5,7 +5,7 @@ import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
-    apiKey: "AIzaSyDxW5CR6kiO5j6D-AW39A9kQSU-5kb_dw0",
+    ApiKey: "deleted EXPOSED KEY"
     authDomain: "gen-lang-client-0375513343.firebaseapp.com",
     projectId: "gen-lang-client-0375513343",
     storageBucket: "gen-lang-client-0375513343.firebasestorage.app",
