@@ -55,7 +55,25 @@ const db = admin.firestore();
 const app = (0, express_1.default)();
 // Middleware
 app.use((0, helmet_1.default)());
-app.use((0, cors_1.default)({ origin: true })); // Allow all origins for now
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'https://preflight-pro.vercel.app',
+    'https://pre-press-app.vercel.app'
+];
+app.use((0, cors_1.default)({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+}));
 app.use(express_1.default.json({ limit: '50mb' })); // Increase limit for PDFs
 // ==================== PDF ANALYSIS ROUTE ====================
 app.post('/api/v1/analyze-pdf', async (req, res) => {

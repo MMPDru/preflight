@@ -29,7 +29,24 @@ const app: Express = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: true })); // Allow all origins for now
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'https://preflight-pro.vercel.app',
+    'https://pre-press-app.vercel.app'
+];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+}));
 app.use(express.json({ limit: '50mb' })); // Increase limit for PDFs
 
 // ==================== PDF ANALYSIS ROUTE ====================
@@ -268,6 +285,8 @@ app.post('/api/v1/approvals/:id/reject', async (req: Request, res: Response) => 
 app.get('/api/v1/approvals/pending/:userId', async (req: Request, res: Response) => {
     try {
         const { userId } = req.params;
+
+
 
         const approvals = await getApprovalService().getPendingApprovals(userId);
 
