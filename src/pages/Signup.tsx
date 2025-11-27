@@ -49,6 +49,7 @@ const Signup: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        console.log('Form submitted');
 
         // Use FormData to get values directly from the form, handling autofill cases
         // where React state might not have updated yet.
@@ -62,33 +63,42 @@ const Signup: React.FC = () => {
             role: formData.role, // Keep role from state as it's a select
         };
 
+        console.log('Form data:', { ...data, password: '***' });
+
         // Sync state with form data (optional but good for UI consistency)
         setFormData(prev => ({ ...prev, ...data }));
 
         // Validate using the captured data
         if (!data.email || !data.password || !data.displayName) {
+            console.log('Validation failed: Missing fields');
             setError('Please fill in all required fields');
             return;
         }
         if (data.password.length < 6) {
+            console.log('Validation failed: Password too short');
             setError('Password must be at least 6 characters');
             return;
         }
         if (data.password !== data.confirmPassword) {
+            console.log('Validation failed: Passwords mismatch');
             setError('Passwords do not match');
             return;
         }
         if (!/\S+@\S+\.\S+/.test(data.email)) {
+            console.log('Validation failed: Invalid email');
             setError('Please enter a valid email address');
             return;
         }
 
         try {
+            console.log('Starting signup process...');
             setError('');
             setLoading(true);
             await signup(data.email, data.password, data.displayName, data.role);
+            console.log('Signup successful, navigating...');
             navigate('/');
         } catch (err: any) {
+            console.error('Signup error:', err);
             setError(err.message || 'Failed to create account');
         } finally {
             setLoading(false);
