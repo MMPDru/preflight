@@ -49,6 +49,29 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' })); // Increase limit for PDFs
 
+// ==================== ADMIN UTILS ====================
+
+app.post('/api/v1/admin/configure-cors', async (req: Request, res: Response) => {
+    try {
+        const bucket = admin.storage().bucket();
+
+        await bucket.setCorsConfiguration([
+            {
+                origin: ["https://pre-press-app.vercel.app", "http://localhost:5173", "http://localhost:4173"],
+                method: ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+                responseHeader: ["Content-Type", "Access-Control-Allow-Origin"],
+                maxAgeSeconds: 3600
+            }
+        ]);
+
+        console.log('CORS configuration updated for bucket:', bucket.name);
+        res.json({ success: true, message: 'CORS configured successfully', bucket: bucket.name });
+    } catch (error: any) {
+        console.error('Error configuring CORS:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ==================== PDF ANALYSIS ROUTE ====================
 
 app.post('/api/v1/analyze-pdf', async (req: Request, res: Response) => {
