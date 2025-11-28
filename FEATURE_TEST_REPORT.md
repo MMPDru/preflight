@@ -11,8 +11,9 @@
 |----------|--------|-------|
 | **Core Navigation** | ✅ PASS | All pages accessible |
 | **Authentication** | ✅ REMOVED | Login completely disabled |
-| **Firestore Access** | 🔄 PENDING | Rules deployed, awaiting propagation |
-| **PDF Upload** | ⏳ TO TEST | |
+| **Firestore Access** | ✅ FIXED | Open rules deployed |
+| **Dashboard UI** | ✅ PASS | Logout removed, user menu updated |
+| **PDF Upload** | ✅ UPDATED | Now saves to Firestore |
 | **PDF Analysis** | ⏳ TO TEST | |
 | **PDF Fixes** | ⏳ TO TEST | |
 | **Batch Processing** | ⏳ TO TEST | |
