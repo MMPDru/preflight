@@ -19,7 +19,11 @@ export const JobList: React.FC<JobListProps> = ({ filter, onClose }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser) {
+            setLoading(false);
+            setJobs([]);
+            return;
+        }
 
         const unsubscribe = jobQueries.subscribeToUserJobs(currentUser.uid, (data) => {
             const filteredJobs = data.filter(job => job.status === filter);

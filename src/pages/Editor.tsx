@@ -52,14 +52,23 @@ export const Editor = () => {
 
                 if (job) {
                     setFileName(job.fileName);
-                    setFileUrl(job.fileUrl || '/sample.pdf');
+                    if (job.fileUrl) {
+                        setFileUrl(job.fileUrl);
+                    } else {
+                        setFileName(`${job.fileName} - UPLOAD FAILED`);
+                        setFileUrl('');
+                        alert(`ERROR: File "${job.fileName}" was not properly uploaded to storage. The file URL is missing. Please try uploading again.`);
+                    }
                 } else {
                     setFileName('File not found');
-                    setFileUrl('/sample.pdf');
+                    setFileUrl('');
+                    alert('ERROR: Job not found in database');
                 }
             } catch (error) {
                 console.error('Failed to load job:', error);
-                setFileUrl('/sample.pdf');
+                setFileName('Error loading file');
+                setFileUrl('');
+                alert(`ERROR: Failed to load job - ${error instanceof Error ? error.message : String(error)}`);
             } finally {
                 setLoading(false);
             }
