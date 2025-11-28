@@ -10,9 +10,32 @@ export async function processFileUpload(file: File): Promise<Job> {
     // Simulate file processing
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Create job entry
+    const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create job entry for Firestore
+    const firestoreJob = {
+        fileName: file.name,
+        status: 'pending',
+        uploadDate: new Date(),
+        fileSize: file.size,
+        userId: 'mock-user-id',
+        fileUrl: '', // Would be populated after upload to Storage
+        analysisResults: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+    };
+
+    // Save to Firestore
+    try {
+        const { jobService } = await import('./firestore-service');
+        await jobService.create(jobId, firestoreJob as any);
+    } catch (error) {
+        console.error('Failed to save job to Firestore:', error);
+    }
+
+    // Create job entry for UI
     const job: Job = {
-        id: `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: jobId,
         fileName: file.name,
         status: 'pending',
         uploadedAt: new Date(),
