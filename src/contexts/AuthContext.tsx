@@ -36,28 +36,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         </div>
     ),
 }) => {
-    // MOCK USER FOR BYPASSING AUTH
-    const mockUser: User = {
-        uid: 'mock-user-id',
-        email: 'admin@preflight.com',
-        displayName: 'Admin User',
-        role: 'admin',
-        photoURL: null,
-        createdAt: Timestamp.now(),
-        lastLogin: Timestamp.now(),
-        preferences: {
-            theme: 'dark',
-            notifications: true,
-        },
-    };
-
-    const [currentUser, setCurrentUser] = useState<User | null>(mockUser);
-    const [loading, setLoading] = useState(false);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Auth bypass enabled - no listener needed
+        // Generate or retrieve a unique user ID for this session/browser
+        let storedUid = localStorage.getItem('preflight_user_uid');
+        if (!storedUid) {
+            storedUid = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('preflight_user_uid', storedUid);
+        }
+
+        const user: User = {
+            uid: storedUid,
+            email: 'user@preflight.com',
+            displayName: 'Guest User',
+            role: 'admin',
+            photoURL: null,
+            createdAt: Timestamp.now(),
+            lastLogin: Timestamp.now(),
+            preferences: {
+                theme: 'dark',
+                notifications: true,
+            },
+        };
+
+        setCurrentUser(user);
         setLoading(false);
-        setCurrentUser(mockUser);
     }, []);
 
     const updateUserProfile = async (data: Partial<User>): Promise<void> => {

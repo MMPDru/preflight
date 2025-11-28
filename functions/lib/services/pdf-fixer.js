@@ -107,8 +107,14 @@ class PdfFixerService {
                     break;
             }
         }
+        // Ensure metadata is set right before saving to avoid overwrites
+        if (operations.includes('normalize')) {
+            pdfDoc.setProducer('PreFlight Pro PDF Processor');
+            pdfDoc.setCreator('PreFlight Pro');
+        }
         // Save and return
-        const savedBytes = await pdfDoc.save();
+        // updateFieldInfo: false prevents pdf-lib from overwriting the Producer/Creator with its own default
+        const savedBytes = await pdfDoc.save({ updateFieldInfo: false });
         return Buffer.from(savedBytes);
     }
     async resetPageBoxes(pdfDoc) {

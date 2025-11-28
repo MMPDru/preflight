@@ -37,8 +37,36 @@ interface Annotation {
 export const Editor = () => {
     const { id } = useParams();
     const location = useLocation();
-    const fileName = location.state?.fileName || "Unknown File.pdf";
-    const [fileUrl, setFileUrl] = useState<string>(location.state?.fileUrl || DEMO_PDF);
+    const [fileName, setFileName] = useState<string>(location.state?.fileName || "Loading...");
+    const [fileUrl, setFileUrl] = useState<string>('');
+    const [loading, setLoading] = useState(true);
+
+    // Load job data from Firestore
+    useEffect(() => {
+        const loadJob = async () => {
+            if (!id) return;
+
+            try {
+                const { jobService } = await import('../lib/firestore-service');
+                const job = await jobService.getById(id);
+
+                if (job) {
+                    setFileName(job.fileName);
+                    setFileUrl(job.fileUrl || '/sample.pdf');
+                } else {
+                    setFileName('File not found');
+                    setFileUrl('/sample.pdf');
+                }
+            } catch (error) {
+                console.error('Failed to load job:', error);
+                setFileUrl('/sample.pdf');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadJob();
+    }, [id]);
 
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [drawingAnnotations, setDrawingAnnotations] = useState<DrawingAnnotation[]>([]);

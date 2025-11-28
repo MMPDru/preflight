@@ -5,7 +5,7 @@ import { JobCard, type Job } from '../components/JobCard';
 import { JobList } from '../components/JobList';
 import { Clock, FileText, CheckCircle, Settings as SettingsIcon, User as UserIcon, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { jobService } from '../lib/firestore-service';
+import { jobService, jobQueries } from '../lib/firestore-service';
 import { validateFile, processFileUpload } from '../lib/upload-handler';
 import { HelpButton } from '../components/HelpButton';
 
@@ -29,13 +29,15 @@ export const Dashboard = () => {
     });
 
     useEffect(() => {
-        const unsubscribe = jobService.subscribe((data) => {
+        if (!currentUser) return;
+
+        const unsubscribe = jobQueries.subscribeToUserJobs(currentUser.uid, (data: any[]) => {
             const uiJobs = data.map(mapJob);
             setJobs(uiJobs);
             setLoadingJobs(false);
-        }, {});
+        });
         return () => unsubscribe();
-    }, []);
+    }, [currentUser]);
 
     const handleUpload = async (files: File[]) => {
         const newJobs: Job[] = [];
@@ -48,7 +50,7 @@ export const Dashboard = () => {
             }
 
             try {
-                const job = await processFileUpload(file);
+                const job = await processFileUpload(file, currentUser?.uid || 'anonymous');
                 newJobs.push(job);
             } catch (e) {
                 console.error('Failed to process file', e);

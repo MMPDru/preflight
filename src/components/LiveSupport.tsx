@@ -8,6 +8,7 @@ interface LiveSupportProps {
     onClose: () => void;
     userName?: string;
     isInline?: boolean;
+    userRole?: string;
 }
 
 interface ChatMessage {

@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Clock, CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { MOCK_JOBS, type JobStatus } from '../lib/mock-data';
+import { jobService, jobQueries } from '../lib/firestore-service';
+import { useAuth } from '../contexts/AuthContext';
+import type { Job } from './JobCard';
+
+type JobStatus = 'queue' | 'pending' | 'completed';
 
 interface JobListProps {
     filter: JobStatus;
@@ -10,7 +14,21 @@ interface JobListProps {
 
 export const JobList: React.FC<JobListProps> = ({ filter, onClose }) => {
     const navigate = useNavigate();
-    const filteredJobs = MOCK_JOBS.filter(job => job.status === filter);
+    const { currentUser } = useAuth();
+    const [jobs, setJobs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const unsubscribe = jobQueries.subscribeToUserJobs(currentUser.uid, (data) => {
+            const filteredJobs = data.filter(job => job.status === filter);
+            setJobs(filteredJobs);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [filter, currentUser]);
 
     const getTitle = () => {
         switch (filter) {
@@ -28,10 +46,8 @@ export const JobList: React.FC<JobListProps> = ({ filter, onClose }) => {
         }
     };
 
-    const handleJobClick = (jobId: string) => {
-        // Navigate to the editor with the job ID
-        // In a real app, this would load the specific job data
-        navigate(`/editor/${jobId}`);
+    const handleJobClick = (jobId: string, fileName: string) => {
+        navigate(`/editor/${jobId}`, { state: { fileName } });
         onClose();
     };
 
@@ -46,7 +62,7 @@ export const JobList: React.FC<JobListProps> = ({ filter, onClose }) => {
                         {getIcon()}
                         <h2 className="text-xl font-bold text-text">{getTitle()}</h2>
                         <span className="px-2 py-0.5 rounded-full bg-background border border-border text-xs font-medium text-muted">
-                            {filteredJobs.length}
+                            {jobs.length}
                         </span>
                     </div>
                     <button onClick={onClose} className="text-muted hover:text-text transition-colors">
@@ -55,16 +71,20 @@ export const JobList: React.FC<JobListProps> = ({ filter, onClose }) => {
                 </div>
 
                 <div className="overflow-auto p-6">
-                    {filteredJobs.length === 0 ? (
+                    {loading ? (
+                        <div className="text-center py-12 text-muted">
+                            <p>Loading jobs...</p>
+                        </div>
+                    ) : jobs.length === 0 ? (
                         <div className="text-center py-12 text-muted">
                             <p>No jobs found in this category.</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {filteredJobs.map(job => (
+                            {jobs.map(job => (
                                 <div
                                     key={job.id}
-                                    onClick={() => handleJobClick(job.id)}
+                                    onClick={() => handleJobClick(job.id, job.fileName)}
                                     className="flex items-center justify-between p-4 bg-background/50 border border-border rounded-lg hover:border-primary/50 transition-colors group cursor-pointer"
                                 >
                                     <div className="flex items-center gap-4">
@@ -72,23 +92,20 @@ export const JobList: React.FC<JobListProps> = ({ filter, onClose }) => {
                                             <FileText size={20} />
                                         </div>
                                         <div>
-                                            <h3 className="font-medium text-text group-hover:text-primary transition-colors">{job.name}</h3>
+                                            <h3 className="font-medium text-text group-hover:text-primary transition-colors">{job.fileName}</h3>
                                             <div className="flex items-center gap-3 mt-1">
                                                 <span className="text-xs text-muted font-mono">{job.id}</span>
                                                 <span className="text-xs text-muted">•</span>
-                                                <span className="text-xs text-muted">{job.date}</span>
+                                                <span className="text-xs text-muted">
+                                                    {job.uploadDate?.toDate ? job.uploadDate.toDate().toLocaleDateString() : 'Recent'}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        {job.priority && (
-                                            <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${job.priority === 'high' ? 'bg-red-500/10 text-red-500' :
-                                                job.priority === 'normal' ? 'bg-blue-500/10 text-blue-500' :
-                                                    'bg-gray-500/10 text-gray-500'
-                                                }`}>
-                                                {job.priority}
-                                            </span>
-                                        )}
+                                        <span className="text-xs text-muted">
+                                            {(job.fileSize / 1024 / 1024).toFixed(2)} MB
+                                        </span>
                                     </div>
                                 </div>
                             ))}

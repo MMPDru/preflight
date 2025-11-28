@@ -6,11 +6,24 @@ export interface UploadProgress {
     status: 'uploading' | 'processing' | 'complete' | 'error';
 }
 
-export async function processFileUpload(file: File): Promise<Job> {
-    // Simulate file processing
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
+export async function processFileUpload(file: File, userId: string): Promise<Job> {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Upload file to Firebase Storage
+    let fileUrl = '';
+    try {
+        const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+        const { storage } = await import('./firebase-config');
+
+        const storageRef = ref(storage, `uploads/${jobId}/${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        fileUrl = await getDownloadURL(snapshot.ref);
+
+        console.log('File uploaded to Storage:', fileUrl);
+    } catch (error) {
+        console.error('Failed to upload to Storage:', error);
+        // Continue anyway with empty URL for now
+    }
 
     // Create job entry for Firestore
     const firestoreJob = {
@@ -18,8 +31,8 @@ export async function processFileUpload(file: File): Promise<Job> {
         status: 'pending',
         uploadDate: new Date(),
         fileSize: file.size,
-        userId: 'mock-user-id',
-        fileUrl: '', // Would be populated after upload to Storage
+        userId: userId,
+        fileUrl: fileUrl,
         analysisResults: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -29,6 +42,7 @@ export async function processFileUpload(file: File): Promise<Job> {
     try {
         const { jobService } = await import('./firestore-service');
         await jobService.create(jobId, firestoreJob as any);
+        console.log('Job saved to Firestore:', jobId);
     } catch (error) {
         console.error('Failed to save job to Firestore:', error);
     }
