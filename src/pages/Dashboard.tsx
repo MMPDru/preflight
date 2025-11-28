@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FileUpload } from '../components/FileUpload';
 import { JobCard, type Job } from '../components/JobCard';
 import { JobList } from '../components/JobList';
-import { Clock, FileText, CheckCircle, Settings as SettingsIcon, LogOut, User as UserIcon, ChevronDown } from 'lucide-react';
+import { Clock, FileText, CheckCircle, Settings as SettingsIcon, User as UserIcon, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { jobService } from '../lib/firestore-service';
 import { validateFile, processFileUpload } from '../lib/upload-handler';
@@ -87,14 +87,7 @@ export const Dashboard = () => {
         return jobs.filter((job) => job.status === status).length;
     };
 
-    const handleLogout = async () => {
-        try {
-            await logout();
-            navigate('/login');
-        } catch (error) {
-            console.error('Logout failed:', error);
-        }
-    };
+
 
     return (
         <div className="min-h-screen bg-background">
@@ -141,17 +134,11 @@ export const Dashboard = () => {
 
                                 {showUserMenu && (
                                     <div className="absolute right-0 mt-2 w-48 bg-surface border border-border rounded-lg shadow-lg py-1 z-50">
-                                        <div className="px-4 py-2 border-b border-border">
+                                        <div className="px-4 py-2">
                                             <p className="text-sm font-medium text-text">{currentUser?.displayName}</p>
                                             <p className="text-xs text-muted truncate">{currentUser?.email}</p>
+                                            <p className="text-xs text-green-500 mt-1">Admin Access</p>
                                         </div>
-                                        <button
-                                            onClick={handleLogout}
-                                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-muted hover:text-text hover:bg-background transition-colors"
-                                        >
-                                            <LogOut size={16} />
-                                            <span>Logout</span>
-                                        </button>
                                     </div>
                                 )}
                             </div>
