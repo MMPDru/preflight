@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
-import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import { Dashboard } from './pages/Dashboard';
@@ -10,9 +9,6 @@ import { Batch } from './pages/Batch';
 import { Settings } from './pages/Settings';
 import { Assets } from './pages/Assets';
 import { UserManagement } from './pages/UserManagement';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import ForgotPassword from './pages/ForgotPassword';
 import { GuestReviewSession } from './pages/GuestReviewSession';
 
 // Components
