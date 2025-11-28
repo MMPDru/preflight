@@ -38,18 +38,47 @@ export async function analyzePDF(file: string | Uint8Array, profile: PreflightPr
 
         if (typeof file === 'string') {
             console.log('[analyzePDF] Processing as string URL');
-            // Add cache-busting to ensure fresh data
-            // Add cache-busting to ensure fresh data, but NOT for blob URLs
-            const isBlob = file.startsWith('blob:');
-            const cacheBustedUrl = isBlob
-                ? file
-                : (file.includes('?') ? `${file}&_t=${Date.now()}` : `${file}?_t=${Date.now()}`);
+            let existingPdfBytes: ArrayBuffer;
 
-            // Load with pdf-lib for structural checks
-            existingPdfBytes = await fetch(cacheBustedUrl, { cache: 'no-store' }).then(res => res.arrayBuffer());
+            // Check if it's a Firebase Storage URL
+            const isFirebaseStorage = file.includes('firebasestorage.googleapis.com');
+            const isBlob = file.startsWith('blob:');
+
+            if (isFirebaseStorage) {
+                console.log('[analyzePDF] Loading from Firebase Storage using SDK...');
+                try {
+                    // Use Firebase Storage SDK to get the file (bypasses CORS)
+                    const { ref, getBlob } = await import('firebase/storage');
+                    const { storage } = await import('./firebase-config');
+
+                    // Extract the path from the URL
+                    // URL format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH?params
+                    const urlObj = new URL(file);
+                    const pathMatch = urlObj.pathname.match(/\/o\/(.+)$/);
+                    if (!pathMatch) throw new Error('Invalid Firebase Storage URL');
+
+                    const storagePath = decodeURIComponent(pathMatch[1]);
+                    const storageRef = ref(storage, storagePath);
+                    const blob = await getBlob(storageRef);
+                    existingPdfBytes = await blob.arrayBuffer();
+
+                    console.log('[analyzePDF] Loaded from Firebase Storage, size:', existingPdfBytes.byteLength);
+                } catch (error) {
+                    console.error('[analyzePDF] Firebase Storage load failed:', error);
+                    throw new Error(`Failed to load PDF from Firebase Storage: ${error}`);
+                }
+            } else {
+                console.log('[analyzePDF] Loading via fetch...');
+                // Add cache-busting for non-blob URLs
+                const cacheBustedUrl = isBlob
+                    ? file
+                    : (file.includes('?') ? `${file}&_t=${Date.now()}` : `${file}?_t=${Date.now()}`);
+
+                existingPdfBytes = await fetch(cacheBustedUrl, { cache: 'no-store' }).then(res => res.arrayBuffer());
+            }
 
             // Load with pdf.js for content analysis
-            const loadingTask = pdfjs.getDocument(cacheBustedUrl);
+            const loadingTask = pdfjs.getDocument({ data: new Uint8Array(existingPdfBytes) });
             pdfProxy = await loadingTask.promise;
         } else {
             console.log('[analyzePDF] Processing as Uint8Array');
