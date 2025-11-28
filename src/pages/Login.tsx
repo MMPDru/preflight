@@ -35,7 +35,7 @@ const Login: React.FC = () => {
             console.error('Login error:', err);
             // Show specific error messages based on Firebase error codes
             if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-                setError('No account found with this email or incorrect credentials. Please check your email and password.');
+                setError('No account found with this email. Please create an account first.');
             } else if (err.code === 'auth/wrong-password') {
                 setError('Incorrect password.');
             } else if (err.code === 'auth/network-request-failed') {

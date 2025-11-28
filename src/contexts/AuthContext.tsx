@@ -36,69 +36,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         </div>
     ),
 }) => {
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
+    // MOCK USER FOR BYPASSING AUTH
+    const mockUser: User = {
+        uid: 'mock-user-id',
+        email: 'admin@preflight.com',
+        displayName: 'Admin User',
+        role: 'admin',
+        photoURL: null,
+        createdAt: Timestamp.now(),
+        lastLogin: Timestamp.now(),
+        preferences: {
+            theme: 'dark',
+            notifications: true,
+        },
+    };
+
+    const [currentUser, setCurrentUser] = useState<User | null>(mockUser);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        let mounted = true;
-
-        // Set timeout to prevent infinite loading
-        const timeout = setTimeout(() => {
-            if (mounted) {
-                console.warn('Auth loading timed out, forcing render');
-                setLoading(false);
-            }
-        }, 5000);
-
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            try {
-                if (firebaseUser) {
-                    // User is signed in, fetch user data from Firestore
-                    // Add a timeout to the Firestore fetch as well
-                    const fetchPromise = userService.getById(firebaseUser.uid);
-                    const timeoutPromise = new Promise<null>((resolve) =>
-                        setTimeout(() => resolve(null), 4000)
-                    );
-
-                    const userData = await Promise.race([fetchPromise, timeoutPromise]);
-
-                    if (mounted) {
-                        if (userData) {
-                            // Update last login
-                            userService.update(firebaseUser.uid, {
-                                lastLogin: Timestamp.now(),
-                            }).catch(console.error); // Don't await this
-                            setCurrentUser(userData);
-                        } else {
-                            // User exists in Auth but not in Firestore
-                            console.error('User not found in Firestore');
-                            // If we can't find the user profile, we treat them as not logged in
-                            // or we could create a basic profile here. 
-                            // For now, let's sign them out to force a clean slate if the DB was wiped.
-                            await signOut(auth);
-                            setCurrentUser(null);
-                        }
-                    }
-                } else {
-                    // User is signed out
-                    if (mounted) setCurrentUser(null);
-                }
-            } catch (error) {
-                console.error('Error in auth state change:', error);
-                if (mounted) setCurrentUser(null);
-            } finally {
-                if (mounted) {
-                    clearTimeout(timeout);
-                    setLoading(false);
-                }
-            }
-        });
-
-        return () => {
-            mounted = false;
-            clearTimeout(timeout);
-            unsubscribe();
-        };
+        // Auth bypass enabled - no listener needed
+        setLoading(false);
+        setCurrentUser(mockUser);
     }, []);
 
     const signup = async (
@@ -174,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             await sendPasswordResetEmail(auth, email);
         } catch (error: any) {
             console.error('Password reset error:', error);
-            throw new Error('Failed to send password reset email');
+            throw new Error(error.message || 'Failed to send password reset email');
         }
     };
 
